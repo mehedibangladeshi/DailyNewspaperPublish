@@ -2,6 +2,7 @@ import shutil
 import zipfile
 
 import pytest
+from ebooklib import epub
 
 from jugantor_epub import epub_builder
 
@@ -122,3 +123,18 @@ def test_build_epub_passes_epubcheck(tmp_path):
 
     result = epubcheck.EpubCheck(str(output_path))
     assert result.valid, result.messages
+
+
+def test_build_epub_sets_publisher_and_description_metadata(tmp_path):
+    output_path = tmp_path / "metadata.epub"
+
+    epub_builder.build_epub(
+        "টেস্ট পত্রিকা", "2026-08-10", _sample_sections(), output_path=str(output_path)
+    )
+
+    book = epub.read_epub(str(output_path))
+    publisher = book.get_metadata("DC", "publisher")
+    description = book.get_metadata("DC", "description")
+
+    assert publisher == [("MHB", {})]
+    assert description == [("Mehedi's personal news digest", {})]

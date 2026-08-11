@@ -69,6 +69,8 @@ def build_epub(source_name, edition_date, sections_with_articles, output_path=No
     book.set_title(f"{source_name} — {edition_date}")
     book.set_language("bn")
     book.add_author(source_name)
+    book.add_metadata("DC", "publisher", "MHB")
+    book.add_metadata("DC", "description", "Mehedi's personal news digest")
 
     style_item = epub.EpubItem(
         uid="style_main",
