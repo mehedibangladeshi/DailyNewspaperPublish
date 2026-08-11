@@ -24,8 +24,10 @@ IMAGE_JPEG_QUALITY = 75
 # shape and listing its name below - main.py already loops over this list.
 SOURCES = ["jugantor"]
 
-# Not implemented yet - see plan's "Deferred For Later" section.
-SEND_TO_KINDLE = False
+SEND_TO_KINDLE = os.environ.get("SEND_TO_KINDLE", "false").lower() == "true"
+KINDLE_EMAIL = os.environ.get("KINDLE_EMAIL")
+GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS")
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 
 
 def make_session():
