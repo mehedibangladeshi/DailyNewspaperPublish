@@ -43,6 +43,6 @@ Three-stage pipeline, wired together in `main.py`: **discover → scrape → bui
 
 **Image handling**: `main.py` caches `images.download_image()` results by URL within a single source's build (`cached_download_image` closure in `build_source_edition`) since multiple articles often share the same photo — `epub_builder.py` separately dedupes by output filename when writing `EpubImage` items into the book. Both layers matter: the cache avoids redundant downloads/re-encodes, the epub_builder dedup avoids duplicate zip entries.
 
-## Deferred (not implemented)
+## Daily automation & Kindle delivery
 
-See `README.md`'s "Not implemented yet" section and the plan at `/Users/mehedihasan/.claude/plans/hey-i-want-to-prancy-sedgewick.md`: daily cron/launchd automation and auto-email to a Kindle `@kindle.com` address are intentionally out of scope for now but the structure (no-arg `main()`, single `build_epub()` call) is meant to support adding them later without restructuring.
+Implemented via a GitHub Actions scheduled workflow (`.github/workflows/daily-kindle.yml`, `cron: '0 2 * * *'` = 08:00 BD time) plus `jugantor_epub/email_sender.py`. `main.py` accumulates `(source_name, output_path)` for every source that builds successfully; when `config.SEND_TO_KINDLE` is true (set by the workflow, unset for local runs) it sends one combined email with every built epub attached via `email_sender.send_to_kindle()`. `main()` now exits non-zero when no source produced an edition or the combined send failed, since failure detection relies on GitHub's built-in failed-workflow notification. See `docs/superpowers/specs/2026-08-11-daily-kindle-automation-design.md` for the full design rationale.

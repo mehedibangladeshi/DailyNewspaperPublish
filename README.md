@@ -43,8 +43,23 @@ functions as `jugantor.py` (`discover_sections()`, `list_articles(slug)`,
 to `config.SOURCES`. `main.py` already loops over that list, so no other code
 changes are needed.
 
-## Not implemented yet (deferred)
+## Daily Kindle delivery (GitHub Actions)
 
-- Daily automation (cron/launchd) — `main.py` takes no arguments and does one
-  full run, so it's schedule-ready as-is; just needs an OS-level cron entry.
-- Auto-email to a Kindle `@kindle.com` Send-to-Kindle address.
+A scheduled GitHub Actions workflow (`.github/workflows/daily-kindle.yml`) runs
+`main.py` every day at 08:00 Bangladesh time (`cron: '0 2 * * *'` UTC), builds
+the day's edition(s), and emails every built `.epub` as an attachment to your
+Kindle in one combined message. Local runs (`.venv/bin/python main.py`) are
+unaffected — they only build the epub into `output/`, no email is attempted.
+
+Required repo secrets (Settings → Secrets and variables → Actions):
+- `GMAIL_ADDRESS` — sender Gmail account.
+- `GMAIL_APP_PASSWORD` — a Google App Password (requires 2FA on that account).
+- `KINDLE_EMAIL` — your `@kindle.com` Send-to-Kindle address (Amazon → Manage
+  Your Content and Devices → Preferences → Personal Document Settings).
+
+One manual one-time step on Amazon's side (can't be automated): add
+`GMAIL_ADDRESS` to Amazon's Approved Personal Document E-mail List, or Amazon
+silently drops the email.
+
+GitHub auto-disables a scheduled workflow after 60 days with zero commits to
+the repo — re-enable it from the Actions tab if that ever happens.
