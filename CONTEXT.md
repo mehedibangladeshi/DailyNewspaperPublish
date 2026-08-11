@@ -14,7 +14,9 @@ The newspaper publishes its daily edition as a set of article-listing pages rath
 - **Scrape HTML directly, no API** — the site is server-rendered with no anti-bot wall encountered during research; no API was found or needed. Article metadata comes from clean `<script type="application/ld+json">` blocks embedded in each article page, which is more reliable than parsing visible HTML for headline/author/date.
 - **All sections, with images, today's date only** — chosen to match "the full daily edition" reading experience over a trimmed-down digest. Historical/back-issue support (the site supports a `?date=` query param) and a curated-subset mode were both explicitly deferred rather than built speculatively.
 - **Embed a Bengali font in the epub** — Kindle devices have no built-in Bengali-capable font, so without embedding one, all Bengali text would render as blank boxes on-device. Noto Sans Bengali (SIL OFL) was chosen as a freely-redistributable open font.
-- **Local file output only, manual run only, one newspaper only (for now)** — see "Deferred work" below. The code is structured to make each of these additive later rather than a rewrite.
+- **One newspaper only (for now)** — see "Deferred work" below; the source-module contract is structured to make adding a second newspaper additive rather than a rewrite.
+- **Daily automation via scheduled GitHub Actions, not local cron/launchd** — `.github/workflows/daily-kindle.yml` runs `main.py` on a daily schedule (plus manual `workflow_dispatch`), so the pipeline runs even when the personal machine is off. Local runs (`.venv/bin/python main.py`) still work unchanged and just build into `output/` without emailing anything.
+- **One combined Kindle email per day, not one email per source** — `jugantor_epub/email_sender.py`'s `send_to_kindle(epub_entries, edition_date)` is called once from `main.py` after *all* sources have finished building, attaching every successfully-built `.epub` to a single message. This was a deliberate rejection of an earlier per-source design (`send_to_kindle(epub_path)` called right after each `build_epub()`) — see the design doc — because Send-to-Kindle delivery is naturally a once-a-day event, and one combined email avoids spamming the Kindle inbox when `config.SOURCES` grows. Sending is gated behind the `config.SEND_TO_KINDLE` env-driven switch (defaults off; the GitHub Actions workflow sets `SEND_TO_KINDLE=true`), and `main.py` exits non-zero if every source fails to build or the send itself fails, so a scheduled run failure is visible in the Actions tab.
 - **Local git identity: `Mehedi Hasan <mehedipy@gmail.com>`, not the work email** — this repo pushes to a personal GitHub account (`git@personal.github.com:mehedibangladeshi/DailyNewspaperPublish.git`, matching the existing `personal.github.com` SSH host alias used by other personal repos like `ai-skills`), so the commit identity is scoped to match, distinct from the global work-email default used elsewhere on this machine.
 
 ## Architecture summary
@@ -32,10 +34,10 @@ Found during initial scraping research and while fixing a code review pass — n
 
 ## Deferred work (explicitly out of scope for now)
 
-Flagged by the user as follow-ups, structurally supported but not built:
+Daily automation and auto-email to Kindle have shipped (see above and
+`CLAUDE.md`). Still flagged by the user as a follow-up, structurally
+supported but not built:
 - **More newspapers** — add a module under `jugantor_epub/sources/` with the same three-function shape, list it in `config.SOURCES`.
-- **Daily automation** — `main.py` takes no arguments and does one complete run; needs only an OS-level cron/launchd entry, no code changes.
-- **Auto-email to Kindle** — planned as an `email_sender.py` with `send_to_kindle(epub_path)` (SMTP to a `@kindle.com` Send-to-Kindle address), gated behind a `SEND_TO_KINDLE` flag in `config.py`, called from `main.py` right after a successful `build_epub()`.
 
 ## Reference
 
