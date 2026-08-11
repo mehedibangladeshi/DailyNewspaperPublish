@@ -1,8 +1,9 @@
 import importlib
 import logging
+import sys
 from datetime import date
 
-from jugantor_epub import config, epub_builder, images
+from jugantor_epub import config, email_sender, epub_builder, images
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -76,13 +77,30 @@ def build_source_edition(source_module, edition_date):
 
 def main():
     edition_date = date.today().isoformat()
+    built = []
     for source_name in config.SOURCES:
         source_module = importlib.import_module(f"jugantor_epub.sources.{source_name}")
         try:
-            build_source_edition(source_module, edition_date)
+            output_path = build_source_edition(source_module, edition_date)
         except Exception as exc:
             logger.error("Skipping source %s: %s", source_name, exc)
+            continue
+        built.append((source_module.SOURCE_NAME, output_path))
+
+    if not built:
+        logger.error("No source produced an edition; nothing to send.")
+        return 1
+
+    if config.SEND_TO_KINDLE:
+        try:
+            email_sender.send_to_kindle(built, edition_date)
+        except Exception as exc:
+            logger.error("Failed to send combined edition to Kindle: %s", exc)
+            return 1
+        logger.info("Sent %d edition(s) to Kindle.", len(built))
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

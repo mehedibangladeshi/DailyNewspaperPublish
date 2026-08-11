@@ -1,3 +1,5 @@
+from datetime import date
+
 import main
 from jugantor_epub import epub_builder, images
 
@@ -27,6 +29,28 @@ class _FakeSourceOk:
             "date_published": "2026-08-10",
             "image_url": "https://img/shared.jpg",
             "paragraphs": ["p1"],
+        }
+
+
+class _FakeSourceOk2:
+    SOURCE_NAME = "Fake Paper 2"
+
+    @staticmethod
+    def discover_sections():
+        return [("sec1", "Section One")]
+
+    @staticmethod
+    def list_articles(slug):
+        return [{"url": "https://x/2", "headline": "H2", "thumbnail": None}]
+
+    @staticmethod
+    def fetch_article(url):
+        return {
+            "headline": "H2 detail",
+            "author": "B",
+            "date_published": "2026-08-10",
+            "image_url": None,
+            "paragraphs": ["p2"],
         }
 
 
@@ -99,6 +123,95 @@ def test_main_continues_to_next_source_after_one_fails(monkeypatch):
         epub_builder, "build_epub", lambda *a, **k: built_for.append(a[0]) or "/tmp/x.epub"
     )
 
-    main.main()
+    exit_code = main.main()
 
     assert built_for == ["Fake Paper"]
+    assert exit_code == 0
+
+
+def test_main_returns_nonzero_when_all_sources_fail(monkeypatch):
+    monkeypatch.setattr(main.config, "SOURCES", ["broken"])
+    monkeypatch.setattr(
+        main.importlib, "import_module", lambda name: _FakeSourceAllFail
+    )
+
+    exit_code = main.main()
+
+    assert exit_code == 1
+
+
+def test_main_does_not_send_when_send_to_kindle_disabled(monkeypatch):
+    sent = []
+
+    monkeypatch.setattr(main.config, "SOURCES", ["ok"])
+    monkeypatch.setattr(main.config, "SEND_TO_KINDLE", False)
+    monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
+    monkeypatch.setattr(
+        main.email_sender, "send_to_kindle", lambda *a, **k: sent.append(a)
+    )
+
+    exit_code = main.main()
+
+    assert sent == []
+    assert exit_code == 0
+
+
+def test_main_sends_combined_email_with_every_built_source(monkeypatch):
+    sent = []
+
+    monkeypatch.setattr(main.config, "SOURCES", ["ok1", "ok2"])
+    monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
+    monkeypatch.setattr(
+        main.importlib,
+        "import_module",
+        lambda name: {
+            "jugantor_epub.sources.ok1": _FakeSourceOk,
+            "jugantor_epub.sources.ok2": _FakeSourceOk2,
+        }[name],
+    )
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(
+        epub_builder,
+        "build_epub",
+        lambda source_name, *a, **k: f"/tmp/{source_name}.epub",
+    )
+    monkeypatch.setattr(
+        main.email_sender, "send_to_kindle", lambda *a, **k: sent.append(a)
+    )
+
+    class _FixedDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 8, 10)
+
+    monkeypatch.setattr(main, "date", _FixedDate)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert len(sent) == 1
+    epub_entries, edition_date = sent[0]
+    assert epub_entries == [
+        ("Fake Paper", "/tmp/Fake Paper.epub"),
+        ("Fake Paper 2", "/tmp/Fake Paper 2.epub"),
+    ]
+    assert edition_date == "2026-08-10"
+
+
+def test_main_returns_nonzero_when_send_to_kindle_fails(monkeypatch):
+    monkeypatch.setattr(main.config, "SOURCES", ["ok"])
+    monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
+    monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
+
+    def _boom(*a, **k):
+        raise RuntimeError("smtp exploded")
+
+    monkeypatch.setattr(main.email_sender, "send_to_kindle", _boom)
+
+    exit_code = main.main()
+
+    assert exit_code == 1
