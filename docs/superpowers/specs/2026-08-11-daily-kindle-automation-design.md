@@ -122,6 +122,21 @@ jobs:
 - `tests/test_email_sender.py`: unit-tests `build_message()` directly against small fixture epub files — asserts one attachment per `(source_name, path)` entry, correct filenames, and MIME type (`application/epub+zip`) for each, including the single-entry and multi-entry (2+ sources) cases.
 - `send_to_kindle()` itself is not unit tested — it's a thin I/O wrapper, consistent with how `_get()` in the scraper is treated (not tested directly; exercised only via the wrappers that call it).
 
+## EPUB metadata decisions
+
+Reviewed the metadata `jugantor_epub/epub_builder.py` currently sets on every book, and decided what to change:
+
+| Field | Current | Decision |
+|---|---|---|
+| Title | `{source_name} — {edition_date}` (e.g. `যুগান্তর — 2026-08-11`) | Unchanged |
+| Author/Creator | `source_name` (e.g. `যুগান্তর`) | Unchanged — credits the newspaper as the content's actual author |
+| Language | `bn` | Unchanged |
+| Identifier | random UUID per build | Unchanged |
+| Publisher | *not set* | **New:** `"MHB"`, via `book.add_metadata('DC', 'publisher', 'MHB')` |
+| Description | *not set* | **New:** `"Mehedi's personal news digest"`, via `book.add_metadata('DC', 'description', "Mehedi's personal news digest")` |
+
+Publisher and description are fixed personal-branding strings, not derived from `source_name` — as more newspaper/magazine sources are added later, these two fields stay the same `"MHB"` / `"Mehedi's personal news digest"` across every source's book. Only Title and Author continue to vary per source, unchanged from today's behavior.
+
 ## Documentation updates
 
 - `README.md`: replace the "Not implemented yet" bullets for automation/Kindle-email with a "Daily Kindle delivery (GitHub Actions)" section covering the cron schedule, the three required secrets, the Amazon approved-sender step, and the 60-day inactivity auto-disable caveat.
