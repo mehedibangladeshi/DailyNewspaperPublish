@@ -1,0 +1,27 @@
+name: Daily Kindle edition
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 02:00 UTC = 08:00 BD time (UTC+6, no DST)
+  workflow_dispatch:
+
+jobs:
+  build-and-send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: pip install -r requirements.txt
+      - run: python main.py
+        env:
+          SEND_TO_KINDLE: 'true'
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jugantor-epub-${{ github.run_id }}
+          path: output/*.epub
+          retention-days: 7
