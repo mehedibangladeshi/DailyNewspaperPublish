@@ -1,7 +1,27 @@
 from datetime import date
 
+import pytest
+
 import main
 from jugantor_epub import epub_builder, images
+
+
+@pytest.fixture(autouse=True)
+def _no_real_kindle_email(monkeypatch):
+    """Guard against any test in this file accidentally dialing out to real
+
+    Gmail SMTP: default sending off and make an unstubbed send_to_kindle call
+    fail loudly instead of silently reaching smtplib. Tests that deliberately
+    exercise sending override these via monkeypatch later in their own body;
+    since they share this fixture's monkeypatch instance, their explicit
+    setattr calls run after these defaults and take precedence.
+    """
+    monkeypatch.setattr(main.config, "SEND_TO_KINDLE", False)
+
+    def _unexpected_send(*args, **kwargs):
+        raise AssertionError("unexpected send")
+
+    monkeypatch.setattr(main.email_sender, "send_to_kindle", _unexpected_send)
 
 
 class _FakeSourceOk:
@@ -79,7 +99,7 @@ def test_build_source_edition_skips_failed_article_and_caches_image_downloads(mo
 
     captured = {}
 
-    def fake_build_epub(source_name, edition_date, sections_with_articles, output_path=None):
+    def fake_build_epub(source_name, edition_date, sections_with_articles, **kwargs):
         captured["sections_with_articles"] = sections_with_articles
         return "/tmp/fake.epub"
 
