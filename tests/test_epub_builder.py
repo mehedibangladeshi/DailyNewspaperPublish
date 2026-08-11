@@ -1,5 +1,6 @@
 import shutil
 import zipfile
+from pathlib import Path
 
 import pytest
 from ebooklib import epub
@@ -106,8 +107,37 @@ def test_build_epub_defaults_output_path_to_config_output_dir(tmp_path, monkeypa
 
     result_path = epub_builder.build_epub("টেস্ট পত্রিকা", "2026-08-10", _sample_sections())
 
+    # No source_slug given, so the default filename falls back to a
+    # slugified source_name (whitespace -> dash; the Bengali text itself is
+    # left intact since modern filesystems handle Unicode filenames fine).
+    expected = str(tmp_path / "টেস্ট-পত্রিকা-2026-08-10.epub")
+    assert result_path == expected
+    assert (tmp_path / "টেস্ট-পত্রিকা-2026-08-10.epub").exists()
+
+
+def test_build_epub_uses_source_slug_for_default_output_path_when_given(tmp_path, monkeypatch):
+    monkeypatch.setattr(epub_builder.config, "OUTPUT_DIR", str(tmp_path))
+
+    result_path = epub_builder.build_epub(
+        "টেস্ট পত্রিকা", "2026-08-10", _sample_sections(), source_slug="jugantor"
+    )
+
     assert result_path == str(tmp_path / "jugantor-2026-08-10.epub")
-    assert (tmp_path / "jugantor-2026-08-10.epub").exists()
+
+
+def test_build_epub_default_output_paths_dont_collide_across_sources(tmp_path, monkeypatch):
+    monkeypatch.setattr(epub_builder.config, "OUTPUT_DIR", str(tmp_path))
+
+    path_a = epub_builder.build_epub(
+        "যুগান্তর", "2026-08-10", _sample_sections(), source_slug="jugantor"
+    )
+    path_b = epub_builder.build_epub(
+        "Prothom Alo", "2026-08-10", _sample_sections(), source_slug="prothomalo"
+    )
+
+    assert path_a != path_b
+    assert Path(path_a).exists()
+    assert Path(path_b).exists()
 
 
 @pytest.mark.skipif(

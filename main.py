@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def build_source_edition(source_module, edition_date):
+def build_source_edition(source_module, edition_date, source_slug=None):
     sections_with_articles = []
     total_articles = 0
     skipped = 0
@@ -61,7 +61,7 @@ def build_source_edition(source_module, edition_date):
         raise RuntimeError(f"No articles were scraped for source {source_module.SOURCE_NAME!r}")
 
     output_path = epub_builder.build_epub(
-        source_module.SOURCE_NAME, edition_date, sections_with_articles
+        source_module.SOURCE_NAME, edition_date, sections_with_articles, source_slug=source_slug
     )
 
     logger.info(
@@ -78,12 +78,12 @@ def build_source_edition(source_module, edition_date):
 def main():
     edition_date = date.today().isoformat()
     built = []
-    for source_name in config.SOURCES:
-        source_module = importlib.import_module(f"jugantor_epub.sources.{source_name}")
+    for source_slug in config.SOURCES:
+        source_module = importlib.import_module(f"jugantor_epub.sources.{source_slug}")
         try:
-            output_path = build_source_edition(source_module, edition_date)
+            output_path = build_source_edition(source_module, edition_date, source_slug)
         except Exception as exc:
-            logger.error("Skipping source %s: %s", source_name, exc)
+            logger.error("Skipping source %s: %s", source_slug, exc)
             continue
         built.append((source_module.SOURCE_NAME, output_path))
 

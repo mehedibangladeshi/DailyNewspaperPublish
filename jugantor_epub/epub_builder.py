@@ -1,5 +1,6 @@
 import html
 import os
+import re
 import uuid
 
 from ebooklib import epub
@@ -40,6 +41,18 @@ img.article-image {
 """ % FONT_URL_FROM_STYLESHEET
 
 
+def _slugify(source_name):
+    """Turn a (possibly non-ASCII) source display name into a filesystem-safe
+    filename fragment: collapse whitespace and characters that are unsafe in
+    filenames into single dashes, otherwise leave the text (including
+    non-Latin scripts like Bengali) untouched -- modern filesystems handle
+    Unicode filenames fine, and this keeps names for distinct sources distinct
+    without needing a transliteration table.
+    """
+    slug = re.sub(r'[\s/\\:*?"<>|]+', "-", source_name.strip()).strip("-")
+    return slug or "edition"
+
+
 def _article_html(article):
     parts = [f"<h2 class='article-headline'>{html.escape(article['headline'])}</h2>"]
 
@@ -57,12 +70,19 @@ def _article_html(article):
     return "\n".join(parts)
 
 
-def build_epub(source_name, edition_date, sections_with_articles, output_path=None):
+def build_epub(
+    source_name, edition_date, sections_with_articles, output_path=None, source_slug=None
+):
     """Assemble the day's scraped sections/articles into an epub file.
 
     sections_with_articles: list of (section_name, [article_dict, ...])
     article_dict keys: headline, author, display_time, image_filename,
                         image_bytes, paragraphs, summary
+    source_slug: filesystem-safe identifier used for the default output
+                 filename (e.g. the config.SOURCES entry, "jugantor"). When
+                 omitted, falls back to a slugified source_name. Callers that
+                 build multiple sources per run should pass distinct slugs so
+                 their default output paths don't collide.
     """
     book = epub.EpubBook()
     book.set_identifier(str(uuid.uuid4()))
@@ -139,7 +159,8 @@ def build_epub(source_name, edition_date, sections_with_articles, output_path=No
 
     if output_path is None:
         os.makedirs(config.OUTPUT_DIR, exist_ok=True)
-        output_path = os.path.join(config.OUTPUT_DIR, f"jugantor-{edition_date}.epub")
+        slug = source_slug or _slugify(source_name)
+        output_path = os.path.join(config.OUTPUT_DIR, f"{slug}-{edition_date}.epub")
 
     epub.write_epub(output_path, book)
     return output_path
