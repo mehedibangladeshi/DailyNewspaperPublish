@@ -21,7 +21,7 @@ The newspaper publishes its daily edition as a set of article-listing pages rath
 
 ## Architecture summary
 
-See `CLAUDE.md` for the details future coding sessions need (commands, the parse/fetch split, error-isolation pattern, Unicode normalization gotcha, JSON-LD parsing quirks, font-embedding bug history). In short: `main.py` orchestrates a discover → scrape → build pipeline over source modules listed in `jugantor_epub/config.SOURCES`; each source module under `jugantor_epub/sources/` implements a small three-function contract so more newspapers can be added later without touching `main.py`.
+See `CLAUDE.md` for the details future coding sessions need (commands, the parse/fetch split, error-isolation pattern, Unicode normalization gotcha, JSON-LD parsing quirks, font-embedding bug history, cover generation). In short: `main.py` orchestrates a discover → scrape → build pipeline over source modules listed in `jugantor_epub/config.SOURCES`; each source module under `jugantor_epub/sources/` implements a small contract (section/article scraping plus a masthead-logo URL for the cover) so more newspapers can be added later without touching `main.py`.
 
 ## Known site quirks worth remembering
 
@@ -37,7 +37,7 @@ Found during initial scraping research and while fixing a code review pass — n
 Daily automation and auto-email to Kindle have shipped (see above and
 `CLAUDE.md`). Still flagged by the user as a follow-up, structurally
 supported but not built:
-- **More newspapers** — add a module under `jugantor_epub/sources/` with the same three-function shape, list it in `config.SOURCES`.
+- **More newspapers** — add a module under `jugantor_epub/sources/` with the same contract shape (including `get_cover_logo_url()`), list it in `config.SOURCES`.
 
 ## Reference
 

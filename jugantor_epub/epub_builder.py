@@ -71,7 +71,12 @@ def _article_html(article):
 
 
 def build_epub(
-    source_name, edition_date, sections_with_articles, output_path=None, source_slug=None
+    source_name,
+    edition_date,
+    sections_with_articles,
+    output_path=None,
+    source_slug=None,
+    cover_image_bytes=None,
 ):
     """Assemble the day's scraped sections/articles into an epub file.
 
@@ -83,6 +88,11 @@ def build_epub(
                  omitted, falls back to a slugified source_name. Callers that
                  build multiple sources per run should pass distinct slugs so
                  their default output paths don't collide.
+    cover_image_bytes: pre-rendered JPEG bytes (see jugantor_epub.cover) used
+                        as both the epub's library-thumbnail cover and the
+                        title page's image. When omitted, the title page
+                        falls back to a plain text heading and no cover
+                        metadata is set.
     """
     book = epub.EpubBook()
     book.set_identifier(str(uuid.uuid4()))
@@ -109,13 +119,19 @@ def build_epub(
         )
     book.add_item(font_item)
 
+    if cover_image_bytes:
+        book.set_cover("cover.jpg", cover_image_bytes, create_page=False)
+        title_page_content = "<img src='cover.jpg' alt='cover' style='width:100%' />"
+    else:
+        title_page_content = (
+            f"<h1 class='section-title'>{html.escape(source_name)}</h1>"
+            f"<p style='text-align:center'>{html.escape(edition_date)}</p>"
+        )
+
     title_page = epub.EpubHtml(
         title="প্রচ্ছদ",
         file_name="title.xhtml",
-        content=(
-            f"<h1 class='section-title'>{html.escape(source_name)}</h1>"
-            f"<p style='text-align:center'>{html.escape(edition_date)}</p>"
-        ),
+        content=title_page_content,
     )
     title_page.add_item(style_item)
     book.add_item(title_page)

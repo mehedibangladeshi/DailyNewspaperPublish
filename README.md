@@ -28,8 +28,13 @@ app / kindle.com library).
 - `jugantor_epub/sources/jugantor.py` — scraping logic for jugantor.com (section
   discovery, article listing, article detail + metadata).
 - `jugantor_epub/images.py` — downloads and resizes article images.
+- `jugantor_epub/cover.py` — renders the epub's cover image (masthead logo +
+  edition date on a branded background), with a text-only fallback if the
+  logo can't be fetched.
+- `jugantor_epub/bengali_date.py` — formats an ISO date as Bengali digits +
+  month name, used on the cover and title page.
 - `jugantor_epub/epub_builder.py` — assembles the scraped content into an epub
-  via `ebooklib`, embedding the Bengali font.
+  via `ebooklib`, embedding the Bengali font and the cover.
 - `jugantor_epub/config.py` — tunables (output dir, request delay, image size,
   the list of enabled sources).
 - `main.py` — CLI entrypoint; runs the full pipeline for every source listed in
@@ -37,9 +42,9 @@ app / kindle.com library).
 
 ## Adding another newspaper later
 
-Add a new module under `jugantor_epub/sources/` exposing the same three
-functions as `jugantor.py` (`discover_sections()`, `list_articles(slug)`,
-`fetch_article(url)`, plus a `SOURCE_NAME` constant), then add its module name
+Add a new module under `jugantor_epub/sources/` exposing the same functions as
+`jugantor.py` (`discover_sections()`, `list_articles(slug)`, `fetch_article(url)`,
+`get_cover_logo_url()`, plus a `SOURCE_NAME` constant), then add its module name
 to `config.SOURCES`. `main.py` already loops over that list, so no other code
 changes are needed.
 

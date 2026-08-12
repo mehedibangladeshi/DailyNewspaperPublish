@@ -210,3 +210,7 @@ def test_parse_article_missing_ldjson_still_returns_body():
     assert article["headline"] == ""
     assert article["author"] == ""
     assert article["paragraphs"] == ["Only body text, no ld+json."]
+
+
+def test_get_cover_logo_url_returns_jugantor_masthead_logo():
+    assert jugantor.get_cover_logo_url() == "https://cdn.jugantor.com/uploads/settings/logo-black.png"

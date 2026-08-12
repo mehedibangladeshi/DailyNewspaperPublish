@@ -155,6 +155,79 @@ def test_build_epub_passes_epubcheck(tmp_path):
     assert result.valid, result.messages
 
 
+def test_build_epub_sets_cover_metadata_when_cover_image_bytes_given(tmp_path):
+    output_path = tmp_path / "with-cover.epub"
+
+    epub_builder.build_epub(
+        "টেস্ট পত্রিকা",
+        "2026-08-10",
+        _sample_sections(),
+        output_path=str(output_path),
+        cover_image_bytes=b"\xff\xd8\xff\xfake-jpeg-bytes",
+    )
+
+    with zipfile.ZipFile(output_path) as zf:
+        assert "EPUB/cover.jpg" in zf.namelist()
+        assert zf.read("EPUB/cover.jpg") == b"\xff\xd8\xff\xfake-jpeg-bytes"
+        opf = zf.read("EPUB/content.opf").decode("utf-8")
+        assert 'name="cover"' in opf
+        assert 'content="cover-img"' in opf
+
+
+def test_build_epub_title_page_embeds_cover_image_when_given(tmp_path):
+    output_path = tmp_path / "title-with-cover.epub"
+
+    epub_builder.build_epub(
+        "টেস্ট পত্রিকা",
+        "2026-08-10",
+        _sample_sections(),
+        output_path=str(output_path),
+        cover_image_bytes=b"\xff\xd8\xff\xfake-jpeg-bytes",
+    )
+
+    with zipfile.ZipFile(output_path) as zf:
+        title_content = zf.read("EPUB/title.xhtml").decode("utf-8")
+        assert "cover.jpg" in title_content
+
+
+def test_build_epub_title_page_uses_plain_heading_when_no_cover_given(tmp_path):
+    output_path = tmp_path / "title-no-cover.epub"
+
+    epub_builder.build_epub(
+        "টেস্ট পত্রিকা", "2026-08-10", _sample_sections(), output_path=str(output_path)
+    )
+
+    with zipfile.ZipFile(output_path) as zf:
+        title_content = zf.read("EPUB/title.xhtml").decode("utf-8")
+        assert "টেস্ট পত্রিকা" in title_content
+        assert "cover.jpg" not in title_content
+
+
+@pytest.mark.skipif(
+    shutil.which("java") is None, reason="epubcheck requires a Java runtime"
+)
+def test_build_epub_with_cover_passes_epubcheck(tmp_path):
+    epubcheck = pytest.importorskip("epubcheck")
+    import io
+
+    from PIL import Image
+
+    output_path = tmp_path / "validated-with-cover.epub"
+    buffer = io.BytesIO()
+    Image.new("RGB", (1600, 2560), "white").save(buffer, format="JPEG")
+
+    epub_builder.build_epub(
+        "টেস্ট পত্রিকা",
+        "2026-08-10",
+        _sample_sections(),
+        output_path=str(output_path),
+        cover_image_bytes=buffer.getvalue(),
+    )
+
+    result = epubcheck.EpubCheck(str(output_path))
+    assert result.valid, result.messages
+
+
 def test_build_epub_sets_publisher_and_description_metadata(tmp_path):
     output_path = tmp_path / "metadata.epub"
 

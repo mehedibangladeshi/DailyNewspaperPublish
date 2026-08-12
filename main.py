@@ -3,7 +3,7 @@ import logging
 import sys
 from datetime import date
 
-from jugantor_epub import config, email_sender, epub_builder, images
+from jugantor_epub import bengali_date, config, cover, email_sender, epub_builder, images
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -60,8 +60,22 @@ def build_source_edition(source_module, edition_date, source_slug=None):
     if total_articles == 0:
         raise RuntimeError(f"No articles were scraped for source {source_module.SOURCE_NAME!r}")
 
+    try:
+        cover_image_bytes = cover.render_cover(
+            source_module.SOURCE_NAME,
+            bengali_date.format_bengali_date(edition_date),
+            source_module.get_cover_logo_url(),
+        )
+    except Exception as exc:
+        logger.warning("Could not render cover for %s: %s", source_module.SOURCE_NAME, exc)
+        cover_image_bytes = None
+
     output_path = epub_builder.build_epub(
-        source_module.SOURCE_NAME, edition_date, sections_with_articles, source_slug=source_slug
+        source_module.SOURCE_NAME,
+        edition_date,
+        sections_with_articles,
+        source_slug=source_slug,
+        cover_image_bytes=cover_image_bytes,
     )
 
     logger.info(

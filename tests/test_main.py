@@ -51,6 +51,10 @@ class _FakeSourceOk:
             "paragraphs": ["p1"],
         }
 
+    @staticmethod
+    def get_cover_logo_url():
+        return "https://x/logo.png"
+
 
 class _FakeSourceOk2:
     SOURCE_NAME = "Fake Paper 2"
@@ -73,6 +77,10 @@ class _FakeSourceOk2:
             "paragraphs": ["p2"],
         }
 
+    @staticmethod
+    def get_cover_logo_url():
+        return "https://x/logo2.png"
+
 
 class _FakeSourceAllFail:
     SOURCE_NAME = "Broken Paper"
@@ -88,6 +96,10 @@ class _FakeSourceAllFail:
     @staticmethod
     def fetch_article(url):
         raise AssertionError("should never be called")
+
+    @staticmethod
+    def get_cover_logo_url():
+        return "https://x/logo.png"
 
 
 def test_build_source_edition_skips_failed_article_and_caches_image_downloads(monkeypatch):
@@ -114,6 +126,49 @@ def test_build_source_edition_skips_failed_article_and_caches_image_downloads(mo
     assert len(articles) == 2
     # both surviving articles share one image URL - should be downloaded once
     assert download_calls == ["https://img/shared.jpg"]
+
+
+def test_build_source_edition_passes_rendered_cover_to_build_epub(monkeypatch):
+    render_calls = []
+
+    def fake_render_cover(source_name, date_text, logo_url):
+        render_calls.append((source_name, date_text, logo_url))
+        return b"COVERBYTES"
+
+    captured = {}
+
+    def fake_build_epub(source_name, edition_date, sections_with_articles, **kwargs):
+        captured["cover_image_bytes"] = kwargs.get("cover_image_bytes")
+        return "/tmp/fake.epub"
+
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(main.cover, "render_cover", fake_render_cover)
+    monkeypatch.setattr(epub_builder, "build_epub", fake_build_epub)
+
+    main.build_source_edition(_FakeSourceOk, "2026-08-10")
+
+    assert render_calls == [("Fake Paper", "১০ আগস্ট, ২০২৬", "https://x/logo.png")]
+    assert captured["cover_image_bytes"] == b"COVERBYTES"
+
+
+def test_build_source_edition_builds_without_cover_when_render_cover_fails(monkeypatch):
+    captured = {}
+
+    def fake_build_epub(source_name, edition_date, sections_with_articles, **kwargs):
+        captured["cover_image_bytes"] = kwargs.get("cover_image_bytes")
+        return "/tmp/fake.epub"
+
+    def _boom(*a, **k):
+        raise RuntimeError("PIL exploded")
+
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(main.cover, "render_cover", _boom)
+    monkeypatch.setattr(epub_builder, "build_epub", fake_build_epub)
+
+    output_path = main.build_source_edition(_FakeSourceOk, "2026-08-10")
+
+    assert output_path == "/tmp/fake.epub"
+    assert captured["cover_image_bytes"] is None
 
 
 def test_build_source_edition_raises_when_nothing_scraped(monkeypatch):

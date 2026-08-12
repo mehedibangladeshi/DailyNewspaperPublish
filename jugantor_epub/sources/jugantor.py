@@ -26,6 +26,7 @@ def _normalize(text):
 
 BASE_URL = "https://www.jugantor.com"
 TODAYS_PAPER_URL = f"{BASE_URL}/todays-paper"
+COVER_LOGO_URL = "https://cdn.jugantor.com/uploads/settings/logo-black.png"
 
 SOURCE_NAME = "যুগান্তর"
 
@@ -191,3 +192,7 @@ def parse_article(html, url):
 def fetch_article(url):
     html = _get(url)
     return parse_article(html, url)
+
+
+def get_cover_logo_url():
+    return COVER_LOGO_URL
