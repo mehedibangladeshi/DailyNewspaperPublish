@@ -47,3 +47,21 @@ def test_kindle_credentials_default_none_when_unset(monkeypatch):
     assert config.KINDLE_EMAIL is None
     assert config.GMAIL_ADDRESS is None
     assert config.GMAIL_APP_PASSWORD is None
+
+
+def test_gmail_app_password_strips_spaces_and_nbsp(monkeypatch):
+    # Google's App Password page groups digits with spaces, and copying
+    # from that page can grab a non-breaking space (\xa0) instead of a
+    # regular one - both must be stripped or smtplib's ASCII-only
+    # credential encoding crashes.
+    monkeypatch.setenv("GMAIL_APP_PASSWORD", "abcd\xa0efgh ijkl mnop")
+    importlib.reload(config)
+    assert config.GMAIL_APP_PASSWORD == "abcdefghijklmnop"
+
+
+def test_kindle_email_and_gmail_address_strip_whitespace(monkeypatch):
+    monkeypatch.setenv("KINDLE_EMAIL", " me@kindle.com\xa0")
+    monkeypatch.setenv("GMAIL_ADDRESS", "\xa0sender@gmail.com ")
+    importlib.reload(config)
+    assert config.KINDLE_EMAIL == "me@kindle.com"
+    assert config.GMAIL_ADDRESS == "sender@gmail.com"

@@ -24,10 +24,24 @@ IMAGE_JPEG_QUALITY = 75
 # shape and listing its name below - main.py already loops over this list.
 SOURCES = ["jugantor"]
 
+def _clean_env(name):
+    """Strip whitespace, including non-breaking spaces copy-pasted from
+
+    Google's App Password page, which otherwise crash smtplib's ASCII-only
+    credential encoding.
+    """
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    return value.replace("\xa0", "").strip()
+
+
 SEND_TO_KINDLE = os.environ.get("SEND_TO_KINDLE", "false").lower() == "true"
-KINDLE_EMAIL = os.environ.get("KINDLE_EMAIL")
-GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS")
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
+KINDLE_EMAIL = _clean_env("KINDLE_EMAIL")
+GMAIL_ADDRESS = _clean_env("GMAIL_ADDRESS")
+GMAIL_APP_PASSWORD = _clean_env("GMAIL_APP_PASSWORD")
+if GMAIL_APP_PASSWORD:
+    GMAIL_APP_PASSWORD = GMAIL_APP_PASSWORD.replace(" ", "")
 
 
 def make_session():
