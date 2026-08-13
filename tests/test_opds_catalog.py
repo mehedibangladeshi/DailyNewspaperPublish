@@ -1,6 +1,9 @@
+import xml.etree.ElementTree as ET
 from datetime import date
 
 from jugantor_epub import opds_catalog
+
+ATOM_NS = "{http://www.w3.org/2005/Atom}"
 
 
 def test_parse_edition_filename_extracts_slug_and_date():
@@ -69,3 +72,39 @@ def test_format_entry_title_single_digit_day_not_zero_padded():
 
 def test_format_entry_title_single_digit_day_one():
     assert opds_catalog.format_entry_title(date(2026, 8, 1)) == "Saturday, 1 Aug, 2026"
+
+
+def test_render_source_feed_xml_is_well_formed_and_has_one_entry_per_kept_file():
+    xml_text = opds_catalog.render_source_feed_xml(
+        "jugantor",
+        "যুগান্তর",
+        ["jugantor-2026-08-13.epub", "jugantor-2026-08-12.epub"],
+        date(2026, 8, 13),
+    )
+    root = ET.fromstring(xml_text)
+    assert root.tag == f"{ATOM_NS}feed"
+    entries = root.findall(f"{ATOM_NS}entry")
+    assert len(entries) == 2
+    titles = [entry.find(f"{ATOM_NS}title").text for entry in entries]
+    assert titles == ["Thursday, 13 Aug, 2026", "Wednesday, 12 Aug, 2026"]
+    acquisition_links = [entry.find(f"{ATOM_NS}link").get("href") for entry in entries]
+    assert acquisition_links == ["jugantor-2026-08-13.epub", "jugantor-2026-08-12.epub"]
+
+
+def test_render_source_feed_xml_empty_when_no_kept_files():
+    xml_text = opds_catalog.render_source_feed_xml("jugantor", "যুগান্তর", [], date(2026, 8, 13))
+    root = ET.fromstring(xml_text)
+    assert root.findall(f"{ATOM_NS}entry") == []
+
+
+def test_render_root_feed_xml_is_well_formed_and_lists_every_source():
+    xml_text = opds_catalog.render_root_feed_xml(
+        [("jugantor", "যুগান্তর"), ("prothomalo", "প্রথম আলো")],
+        date(2026, 8, 13),
+    )
+    root = ET.fromstring(xml_text)
+    assert root.tag == f"{ATOM_NS}feed"
+    entries = root.findall(f"{ATOM_NS}entry")
+    assert len(entries) == 2
+    hrefs = [entry.find(f"{ATOM_NS}link").get("href") for entry in entries]
+    assert hrefs == ["jugantor/feed.xml", "prothomalo/feed.xml"]
