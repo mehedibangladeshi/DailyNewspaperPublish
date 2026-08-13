@@ -37,6 +37,11 @@ app / kindle.com library).
   via `ebooklib`, embedding the Bengali font and the cover.
 - `jugantor_epub/config.py` — tunables (output dir, request delay, image size,
   the list of enabled sources).
+- `jugantor_epub/opds_catalog.py` — pure functions that build the OPDS
+  catalog XML (per-newspaper retention, feed rendering) from filenames and
+  dates, no I/O.
+- `jugantor_epub/opds_publish.py` — reads/writes the `gh-pages` checkout,
+  calling into `opds_catalog.py` to decide what to keep, evict, and render.
 - `main.py` — CLI entrypoint; runs the full pipeline for every source listed in
   `config.SOURCES`.
 
@@ -68,3 +73,14 @@ silently drops the email.
 
 GitHub auto-disables a scheduled workflow after 60 days with zero commits to
 the repo — re-enable it from the Actions tab if that ever happens.
+
+## OPDS catalog (for Boox / KOReader / other OPDS-capable readers)
+
+The same daily workflow also publishes a static OPDS catalog to GitHub
+Pages at `https://mehedibangladeshi.github.io/DailyNewspaperPublish/catalog.xml`.
+Add that URL to any OPDS-capable reader app (KOReader, Moon+ Reader, etc.)
+to browse and download editions directly — no email step needed. Each
+configured newspaper gets its own feed holding its last 7 editions (by
+count, not calendar days). This is independent of Kindle delivery above —
+Kindle's stock firmware has no OPDS client, so email remains the way
+editions reach a Kindle.
