@@ -86,3 +86,25 @@ Kindle's stock firmware has no OPDS client, so email remains the way
 editions reach a Kindle.
 
 One-time manual step (can't be automated): enable GitHub Pages for this repo — Settings → Pages → Source: "Deploy from a branch" → select `gh-pages` / `/ (root)`. Until this is done, the catalog URL above will 404.
+
+### Testing the catalog after a fresh push
+
+Pushing to `main` doesn't publish anything by itself — it just updates the
+workflow's code. To actually see the catalog live:
+
+1. Trigger the workflow once by hand: Actions tab → "Daily Kindle edition" →
+   "Run workflow" (or `gh workflow run daily-kindle.yml`). This is what
+   builds the `gh-pages` branch for the first time — don't wait for the
+   next 08:00 BD scheduled run.
+2. Enable GitHub Pages (above), if you haven't already.
+3. Open `https://mehedibangladeshi.github.io/DailyNewspaperPublish/catalog.xml`
+   in a browser to see the raw feed, or add that same URL as an OPDS
+   catalog in KOReader / Moon+ Reader.
+
+Re-running the workflow again later the same day is safe to do repeatedly
+while testing — `main.py` always rebuilds `output/{slug}-{date}.epub` from
+a fresh scrape, and the OPDS publish step always replaces that day's
+already-published copy with the latest rebuild (rather than keeping
+whichever version was published first). Note this also re-sends the
+Kindle email each time, since that's a separate, unrelated side effect of
+the same run.

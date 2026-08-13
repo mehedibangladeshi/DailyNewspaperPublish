@@ -62,9 +62,13 @@ def _publish_source(gh_pages_dir, output_dir, slug, source_name, edition_date, t
     kept, evicted = keep_latest_n(candidates, config.OPDS_RETENTION_COUNT)
 
     if todays_filename in kept:
+        # Always copy, even if a same-named file is already published: a
+        # same-day re-run (manual re-trigger, or just re-running locally)
+        # rebuilds output/{slug}-{date}.epub from scratch under the same
+        # filename, and the freshly rebuilt content must replace whatever
+        # an earlier run that day already published.
         dest_path = os.path.join(source_dir, todays_filename)
-        if not os.path.exists(dest_path):
-            shutil.copyfile(todays_output_path, dest_path)
+        shutil.copyfile(todays_output_path, dest_path)
 
     feed_xml = render_source_feed_xml(slug, source_name, kept, today)
     with open(os.path.join(source_dir, "feed.xml"), "w", encoding="utf-8") as fh:
