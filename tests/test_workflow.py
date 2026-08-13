@@ -39,6 +39,14 @@ def test_workflow_checks_out_gh_pages_branch_only_if_it_exists():
     assert "ref: gh-pages" in content
     assert "git ls-remote --exit-code --heads origin gh-pages" in content
     assert "steps.gh_pages_exists.outputs.exists == 'true'" in content
+    # an ambiguous ls-remote result (network/auth error, not "no such branch")
+    # must not be treated as "branch absent" - see the exists=unknown branch
+    assert 'echo "exists=unknown" >> "$GITHUB_OUTPUT"' in content
+    # a transient checkout failure of an existing branch must not fail the
+    # whole job (that would block Kindle delivery too) - the publish step's
+    # own outcome==success check is what keeps a failed checkout from
+    # publishing, not this job-level continue-on-error
+    assert "continue-on-error: true" in content
 
 
 def test_workflow_runs_main_with_opds_env_vars():
