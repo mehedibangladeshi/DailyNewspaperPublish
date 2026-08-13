@@ -27,3 +27,28 @@ def test_workflow_uploads_epub_artifact_always():
     assert "if: always()" in content
     assert "path: output/*.epub" in content
     assert "retention-days: 7" in content
+
+
+def test_workflow_has_write_permission_for_gh_pages_publish():
+    content = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "contents: write" in content
+
+
+def test_workflow_checks_out_gh_pages_branch_with_continue_on_error():
+    content = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "ref: gh-pages" in content
+    assert "continue-on-error: true" in content
+    assert "path: gh-pages-checkout" in content
+
+
+def test_workflow_runs_main_with_opds_env_vars():
+    content = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "PUBLISH_OPDS: 'true'" in content
+    assert "GH_PAGES_DIR: gh-pages-checkout" in content
+
+
+def test_workflow_publishes_to_gh_pages_with_keep_files_false_and_force_orphan():
+    content = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "uses: peaceiris/actions-gh-pages@v3" in content
+    assert "keep_files: false" in content
+    assert "force_orphan: true" in content
