@@ -26,14 +26,19 @@ def publish_catalog(gh_pages_dir, output_dir, edition_date):
     sources = []
 
     for slug in config.SOURCES:
-        source_module = importlib.import_module(f"jugantor_epub.sources.{slug}")
-        source_name = source_module.SOURCE_NAME
-        sources.append((slug, source_name))
-
         try:
+            source_module = importlib.import_module(f"jugantor_epub.sources.{slug}")
+            source_name = source_module.SOURCE_NAME
+            sources.append((slug, source_name))
             _publish_source(gh_pages_dir, output_dir, slug, source_name, edition_date, today)
         except Exception as exc:
             logger.warning("Skipping OPDS publish for %s: %s", slug, exc)
+            # If the import/SOURCE_NAME lookup itself failed, `slug` was
+            # never appended above - fall back to the slug as its own
+            # display name so it still gets a nav entry in catalog.xml
+            # (every configured source must appear, per the design).
+            if not any(s == slug for s, _ in sources):
+                sources.append((slug, slug))
 
     root_xml = render_root_feed_xml(sources, today)
     with open(os.path.join(gh_pages_dir, "catalog.xml"), "w", encoding="utf-8") as fh:
@@ -54,11 +59,6 @@ def _publish_source(gh_pages_dir, output_dir, slug, source_name, edition_date, t
 
     kept, evicted = keep_latest_n(candidates, config.OPDS_RETENTION_COUNT)
 
-    for filename in evicted:
-        evicted_path = os.path.join(source_dir, filename)
-        if os.path.exists(evicted_path):
-            os.remove(evicted_path)
-
     if todays_filename in kept:
         dest_path = os.path.join(source_dir, todays_filename)
         if not os.path.exists(dest_path):
@@ -67,3 +67,11 @@ def _publish_source(gh_pages_dir, output_dir, slug, source_name, edition_date, t
     feed_xml = render_source_feed_xml(slug, source_name, kept, today)
     with open(os.path.join(source_dir, "feed.xml"), "w", encoding="utf-8") as fh:
         fh.write(feed_xml)
+
+    # Evict only after the copy-in and feed.xml write both succeeded, so a
+    # mid-publish failure (e.g. disk full during copyfile) never leaves a
+    # feed.xml that references files we've already deleted from disk.
+    for filename in evicted:
+        evicted_path = os.path.join(source_dir, filename)
+        if os.path.exists(evicted_path):
+            os.remove(evicted_path)
