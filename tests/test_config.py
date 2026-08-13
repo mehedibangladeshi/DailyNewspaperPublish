@@ -65,3 +65,38 @@ def test_kindle_email_and_gmail_address_strip_whitespace(monkeypatch):
     importlib.reload(config)
     assert config.KINDLE_EMAIL == "me@kindle.com"
     assert config.GMAIL_ADDRESS == "sender@gmail.com"
+
+
+def test_publish_opds_defaults_false_when_env_unset(monkeypatch):
+    monkeypatch.delenv("PUBLISH_OPDS", raising=False)
+    importlib.reload(config)
+    assert config.PUBLISH_OPDS is False
+
+
+def test_publish_opds_true_when_env_set_true(monkeypatch):
+    monkeypatch.setenv("PUBLISH_OPDS", "true")
+    importlib.reload(config)
+    assert config.PUBLISH_OPDS is True
+
+
+def test_publish_opds_case_insensitive(monkeypatch):
+    monkeypatch.setenv("PUBLISH_OPDS", "TRUE")
+    importlib.reload(config)
+    assert config.PUBLISH_OPDS is True
+
+
+def test_gh_pages_dir_defaults_to_gh_pages_checkout(monkeypatch):
+    monkeypatch.delenv("GH_PAGES_DIR", raising=False)
+    importlib.reload(config)
+    assert config.GH_PAGES_DIR == "gh-pages-checkout"
+
+
+def test_gh_pages_dir_read_from_env(monkeypatch):
+    monkeypatch.setenv("GH_PAGES_DIR", "/custom/path")
+    importlib.reload(config)
+    assert config.GH_PAGES_DIR == "/custom/path"
+
+
+def test_opds_base_url_and_retention_count_are_fixed():
+    assert config.OPDS_BASE_URL == "https://mehedibangladeshi.github.io/DailyNewspaperPublish/"
+    assert config.OPDS_RETENTION_COUNT == 7

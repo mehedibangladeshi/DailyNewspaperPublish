@@ -43,6 +43,11 @@ GMAIL_APP_PASSWORD = _clean_env("GMAIL_APP_PASSWORD")
 if GMAIL_APP_PASSWORD:
     GMAIL_APP_PASSWORD = GMAIL_APP_PASSWORD.replace(" ", "")
 
+PUBLISH_OPDS = os.environ.get("PUBLISH_OPDS", "false").lower() == "true"
+OPDS_BASE_URL = "https://mehedibangladeshi.github.io/DailyNewspaperPublish/"
+OPDS_RETENTION_COUNT = 7
+GH_PAGES_DIR = os.environ.get("GH_PAGES_DIR", "gh-pages-checkout")
+
 
 def make_session():
     session = requests.Session()
