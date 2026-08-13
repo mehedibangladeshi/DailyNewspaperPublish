@@ -3,7 +3,7 @@ import logging
 import sys
 from datetime import date
 
-from jugantor_epub import bengali_date, config, cover, email_sender, epub_builder, images
+from jugantor_epub import bengali_date, config, cover, email_sender, epub_builder, images, opds_publish
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -112,6 +112,14 @@ def main():
             logger.error("Failed to send combined edition to Kindle: %s", exc)
             return 1
         logger.info("Sent %d edition(s) to Kindle.", len(built))
+
+    if config.PUBLISH_OPDS:
+        try:
+            opds_publish.publish_catalog(config.GH_PAGES_DIR, config.OUTPUT_DIR, edition_date)
+        except Exception as exc:
+            logger.error("Failed to publish OPDS catalog: %s", exc)
+            return 1
+        logger.info("Published OPDS catalog to %s", config.GH_PAGES_DIR)
 
     return 0
 

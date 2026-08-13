@@ -24,6 +24,17 @@ def _no_real_kindle_email(monkeypatch):
     monkeypatch.setattr(main.email_sender, "send_to_kindle", _unexpected_send)
 
 
+@pytest.fixture(autouse=True)
+def _no_real_opds_publish(monkeypatch):
+    """Same guard as _no_real_kindle_email, for the OPDS publish path."""
+    monkeypatch.setattr(main.config, "PUBLISH_OPDS", False)
+
+    def _unexpected_publish(*args, **kwargs):
+        raise AssertionError("unexpected publish")
+
+    monkeypatch.setattr(main.opds_publish, "publish_catalog", _unexpected_publish)
+
+
 class _FakeSourceOk:
     SOURCE_NAME = "Fake Paper"
 
@@ -286,6 +297,62 @@ def test_main_returns_nonzero_when_send_to_kindle_fails(monkeypatch):
         raise RuntimeError("smtp exploded")
 
     monkeypatch.setattr(main.email_sender, "send_to_kindle", _boom)
+
+    exit_code = main.main()
+
+    assert exit_code == 1
+
+
+def test_main_does_not_publish_opds_when_disabled(monkeypatch):
+    monkeypatch.setattr(main.config, "SOURCES", ["ok"])
+    monkeypatch.setattr(main.config, "PUBLISH_OPDS", False)
+    monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+
+
+def test_main_publishes_opds_catalog_when_enabled(monkeypatch):
+    published = []
+
+    monkeypatch.setattr(main.config, "SOURCES", ["ok"])
+    monkeypatch.setattr(main.config, "PUBLISH_OPDS", True)
+    monkeypatch.setattr(main.config, "GH_PAGES_DIR", "/tmp/gh-pages")
+    monkeypatch.setattr(main.config, "OUTPUT_DIR", "/tmp/output")
+    monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
+    monkeypatch.setattr(
+        main.opds_publish, "publish_catalog", lambda *a, **k: published.append(a)
+    )
+
+    class _FixedDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 8, 10)
+
+    monkeypatch.setattr(main, "date", _FixedDate)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert published == [("/tmp/gh-pages", "/tmp/output", "2026-08-10")]
+
+
+def test_main_returns_nonzero_when_opds_publish_fails(monkeypatch):
+    monkeypatch.setattr(main.config, "SOURCES", ["ok"])
+    monkeypatch.setattr(main.config, "PUBLISH_OPDS", True)
+    monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
+
+    def _boom(*a, **k):
+        raise RuntimeError("disk exploded")
+
+    monkeypatch.setattr(main.opds_publish, "publish_catalog", _boom)
 
     exit_code = main.main()
 
