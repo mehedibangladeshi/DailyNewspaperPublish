@@ -89,6 +89,7 @@ def test_render_source_feed_xml_is_well_formed_and_has_one_entry_per_kept_file()
     assert titles == ["Thursday, 13 Aug, 2026", "Wednesday, 12 Aug, 2026"]
     acquisition_links = [entry.find(f"{ATOM_NS}link").get("href") for entry in entries]
     assert acquisition_links == ["jugantor-2026-08-13.epub", "jugantor-2026-08-12.epub"]
+    assert root.find(f"{ATOM_NS}author/{ATOM_NS}name").text == "যুগান্তর"
 
 
 def test_render_source_feed_xml_empty_when_no_kept_files():
@@ -108,3 +109,4 @@ def test_render_root_feed_xml_is_well_formed_and_lists_every_source():
     assert len(entries) == 2
     hrefs = [entry.find(f"{ATOM_NS}link").get("href") for entry in entries]
     assert hrefs == ["jugantor/feed.xml", "prothomalo/feed.xml"]
+    assert root.find(f"{ATOM_NS}author/{ATOM_NS}name").text == "Daily Newspaper"

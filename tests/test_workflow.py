@@ -34,11 +34,11 @@ def test_workflow_has_write_permission_for_gh_pages_publish():
     assert "contents: write" in content
 
 
-def test_workflow_checks_out_gh_pages_branch_with_continue_on_error():
+def test_workflow_checks_out_gh_pages_branch_only_if_it_exists():
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "ref: gh-pages" in content
-    assert "continue-on-error: true" in content
-    assert "path: gh-pages-checkout" in content
+    assert "git ls-remote --exit-code --heads origin gh-pages" in content
+    assert "steps.gh_pages_exists.outputs.exists == 'true'" in content
 
 
 def test_workflow_runs_main_with_opds_env_vars():
@@ -52,3 +52,8 @@ def test_workflow_publishes_to_gh_pages_with_keep_files_false_and_force_orphan()
     assert "uses: peaceiris/actions-gh-pages@v3" in content
     assert "keep_files: false" in content
     assert "force_orphan: true" in content
+
+
+def test_workflow_publish_step_gated_on_checkout_outcome():
+    content = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "steps.gh_pages_exists.outputs.exists == 'false' || steps.gh_pages_checkout.outcome == 'success'" in content

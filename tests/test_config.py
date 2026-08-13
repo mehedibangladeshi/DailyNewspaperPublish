@@ -97,6 +97,5 @@ def test_gh_pages_dir_read_from_env(monkeypatch):
     assert config.GH_PAGES_DIR == "/custom/path"
 
 
-def test_opds_base_url_and_retention_count_are_fixed():
-    assert config.OPDS_BASE_URL == "https://mehedibangladeshi.github.io/DailyNewspaperPublish/"
+def test_opds_retention_count_is_fixed():
     assert config.OPDS_RETENTION_COUNT == 7

@@ -25,6 +25,8 @@ def publish_catalog(gh_pages_dir, output_dir, edition_date):
     today = date.fromisoformat(edition_date)
     sources = []
 
+    os.makedirs(gh_pages_dir, exist_ok=True)
+
     for slug in config.SOURCES:
         try:
             source_module = importlib.import_module(f"jugantor_epub.sources.{slug}")

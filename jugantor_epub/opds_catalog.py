@@ -83,6 +83,8 @@ def render_source_feed_xml(slug, source_name, kept_filenames, updated_date):
     _add_child(feed, "id", text=f"urn:daily-newspaper-opds:source:{slug}")
     _add_child(feed, "title", text=source_name)
     _add_child(feed, "updated", text=f"{updated_date.isoformat()}T00:00:00Z")
+    author = _add_child(feed, "author")
+    _add_child(author, "name", text=source_name)
     _add_child(
         feed, "link", rel="self", href="feed.xml",
         type="application/atom+xml;profile=opds-catalog;kind=acquisition",
@@ -119,6 +121,8 @@ def render_root_feed_xml(sources, updated_date):
     _add_child(feed, "id", text="urn:daily-newspaper-opds:catalog")
     _add_child(feed, "title", text="Daily Newspaper — Catalog")
     _add_child(feed, "updated", text=f"{updated_date.isoformat()}T00:00:00Z")
+    author = _add_child(feed, "author")
+    _add_child(author, "name", text="Daily Newspaper")
     _add_child(
         feed, "link", rel="self", href="catalog.xml",
         type="application/atom+xml;profile=opds-catalog;kind=navigation",

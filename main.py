@@ -105,23 +105,26 @@ def main():
         logger.error("No source produced an edition; nothing to send.")
         return 1
 
+    exit_code = 0
     if config.SEND_TO_KINDLE:
         try:
             email_sender.send_to_kindle(built, edition_date)
         except Exception as exc:
             logger.error("Failed to send combined edition to Kindle: %s", exc)
-            return 1
-        logger.info("Sent %d edition(s) to Kindle.", len(built))
+            exit_code = 1
+        else:
+            logger.info("Sent %d edition(s) to Kindle.", len(built))
 
     if config.PUBLISH_OPDS:
         try:
             opds_publish.publish_catalog(config.GH_PAGES_DIR, config.OUTPUT_DIR, edition_date)
         except Exception as exc:
             logger.error("Failed to publish OPDS catalog: %s", exc)
-            return 1
-        logger.info("Published OPDS catalog to %s", config.GH_PAGES_DIR)
+            exit_code = 1
+        else:
+            logger.info("Published OPDS catalog to %s", config.GH_PAGES_DIR)
 
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":

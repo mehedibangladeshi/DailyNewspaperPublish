@@ -9,13 +9,23 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      GH_PAGES_DIR: gh-pages-checkout
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        continue-on-error: true
+      - id: gh_pages_exists
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - id: gh_pages_checkout
+        if: steps.gh_pages_exists.outputs.exists == 'true'
+        uses: actions/checkout@v4
         with:
           ref: gh-pages
-          path: gh-pages-checkout
+          path: ${{ env.GH_PAGES_DIR }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
@@ -27,7 +37,6 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
           PUBLISH_OPDS: 'true'
-          GH_PAGES_DIR: gh-pages-checkout
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -35,9 +44,9 @@ jobs:
           path: output/*.epub
           retention-days: 7
       - uses: peaceiris/actions-gh-pages@v3
-        if: always()
+        if: always() && (steps.gh_pages_exists.outputs.exists == 'false' || steps.gh_pages_checkout.outcome == 'success')
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: gh-pages-checkout
+          publish_dir: ${{ env.GH_PAGES_DIR }}
           keep_files: false
           force_orphan: true

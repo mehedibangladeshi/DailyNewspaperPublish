@@ -84,3 +84,5 @@ configured newspaper gets its own feed holding its last 7 editions (by
 count, not calendar days). This is independent of Kindle delivery above —
 Kindle's stock firmware has no OPDS client, so email remains the way
 editions reach a Kindle.
+
+One-time manual step (can't be automated): enable GitHub Pages for this repo — Settings → Pages → Source: "Deploy from a branch" → select `gh-pages` / `/ (root)`. Until this is done, the catalog URL above will 404.

@@ -357,3 +357,27 @@ def test_main_returns_nonzero_when_opds_publish_fails(monkeypatch):
     exit_code = main.main()
 
     assert exit_code == 1
+
+
+def test_main_still_publishes_opds_when_kindle_send_fails(monkeypatch):
+    published = []
+
+    monkeypatch.setattr(main.config, "SOURCES", ["ok"])
+    monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
+    monkeypatch.setattr(main.config, "PUBLISH_OPDS", True)
+    monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
+
+    def _boom(*a, **k):
+        raise RuntimeError("smtp exploded")
+
+    monkeypatch.setattr(main.email_sender, "send_to_kindle", _boom)
+    monkeypatch.setattr(
+        main.opds_publish, "publish_catalog", lambda *a, **k: published.append(a)
+    )
+
+    exit_code = main.main()
+
+    assert exit_code == 1  # Kindle failure still surfaces as a failed run
+    assert len(published) == 1  # but OPDS still got published
