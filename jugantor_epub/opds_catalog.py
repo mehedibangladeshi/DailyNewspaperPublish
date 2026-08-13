@@ -48,3 +48,12 @@ def keep_latest_n(filenames, n):
     kept = [name for _, name in dated[:n]]
     evicted = [name for _, name in dated[n:]]
     return kept, evicted
+
+
+def format_entry_title(edition_date):
+    """'Thursday, 3 Aug, 2026' - day is never zero-padded (the user's
+    explicit choice over "Thursday, 03 Aug, 2026").
+    """
+    weekday = edition_date.strftime("%A")
+    month = edition_date.strftime("%b")
+    return f"{weekday}, {edition_date.day} {month}, {edition_date.year}"

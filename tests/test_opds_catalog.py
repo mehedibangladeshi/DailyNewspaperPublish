@@ -57,3 +57,15 @@ def test_keep_latest_n_ignores_unparseable_filenames():
     kept, evicted = opds_catalog.keep_latest_n(filenames, 7)
     assert kept == ["jugantor-2026-08-13.epub"]
     assert evicted == []
+
+
+def test_format_entry_title_two_digit_day():
+    assert opds_catalog.format_entry_title(date(2026, 8, 13)) == "Thursday, 13 Aug, 2026"
+
+
+def test_format_entry_title_single_digit_day_not_zero_padded():
+    assert opds_catalog.format_entry_title(date(2026, 8, 3)) == "Monday, 3 Aug, 2026"
+
+
+def test_format_entry_title_single_digit_day_one():
+    assert opds_catalog.format_entry_title(date(2026, 8, 1)) == "Saturday, 1 Aug, 2026"
