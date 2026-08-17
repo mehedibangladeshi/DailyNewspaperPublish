@@ -67,6 +67,10 @@ class _FakeSourceOk:
     def get_cover_logo_url():
         return "https://x/logo.png"
 
+    @staticmethod
+    def format_date(edition_date):
+        return f"formatted-{edition_date}"
+
 
 class _FakeSourceOk2:
     SOURCE_NAME = "Fake Paper 2"
@@ -93,6 +97,10 @@ class _FakeSourceOk2:
     @staticmethod
     def get_cover_logo_url():
         return "https://x/logo2.png"
+
+    @staticmethod
+    def format_date(edition_date):
+        return f"formatted-{edition_date}"
 
 
 class _FakeSourceAllFail:
@@ -160,7 +168,7 @@ def test_build_source_edition_passes_rendered_cover_to_build_epub(monkeypatch):
 
     main.build_source_edition(_FakeSourceOk, "2026-08-10")
 
-    assert render_calls == [("Fake Paper", "১০ আগস্ট, ২০২৬", "https://x/logo.png", (10, 20, 30), None)]
+    assert render_calls == [("Fake Paper", "formatted-2026-08-10", "https://x/logo.png", (10, 20, 30), None)]
     assert captured["cover_image_bytes"] == b"COVERBYTES"
 
 

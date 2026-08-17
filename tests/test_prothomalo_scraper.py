@@ -4,7 +4,7 @@ import pytest
 import requests
 from bs4 import BeautifulSoup
 
-from jugantor_epub.sources import prothomalo
+from jugantor_epub.sources import ld_json, prothomalo
 
 
 def test_parse_sections_finds_expected_slugs(load_fixture):
@@ -190,7 +190,7 @@ def test_parse_article_finds_newsarticle_block_even_though_breadcrumblist_is_fir
     """Regression: unlike Jugantor, the first ld+json block on a Prothom Alo
     article page is a BreadcrumbList, not the article metadata."""
     html = load_fixture("prothomalo_article_sample.html")
-    soup_metadata = prothomalo._select_newsarticle_metadata(BeautifulSoup(html, "html.parser"))
+    soup_metadata = ld_json.select_by_type(BeautifulSoup(html, "html.parser"), "NewsArticle")
 
     assert soup_metadata.get("@type") == "NewsArticle"
     assert soup_metadata.get("headline")
@@ -342,3 +342,7 @@ def test_prepare_logo_image_keeps_non_background_pixels_opaque():
     result = prothomalo.prepare_logo_image(source)
 
     assert result.getpixel((25, 25)) == (10, 10, 10, 255)
+
+
+def test_format_date_uses_bengali_formatting():
+    assert prothomalo.format_date("2026-08-17") == "১৭ আগস্ট, ২০২৬"

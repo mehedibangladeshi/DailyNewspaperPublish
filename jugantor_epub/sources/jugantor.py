@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 
-from .. import config
+from .. import bengali_date, config
 from .text_utils import extract_text as _text
 from .text_utils import normalize_text as _normalize
 
@@ -185,3 +185,7 @@ def fetch_article(url):
 
 def get_cover_logo_url():
     return COVER_LOGO_URL
+
+
+def format_date(edition_date):
+    return bengali_date.format_bengali_date(edition_date)

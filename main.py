@@ -3,7 +3,7 @@ import logging
 import sys
 from datetime import date
 
-from jugantor_epub import bengali_date, config, cover, email_sender, epub_builder, images, opds_publish
+from jugantor_epub import config, cover, email_sender, epub_builder, images, opds_publish
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ def build_source_edition(source_module, edition_date, source_slug=None):
     try:
         cover_image_bytes = cover.render_cover(
             source_module.SOURCE_NAME,
-            bengali_date.format_bengali_date(edition_date),
+            source_module.format_date(edition_date),
             source_module.get_cover_logo_url(),
             source_module.COVER_ACCENT_COLOR,
             prepare_logo=getattr(source_module, "prepare_logo_image", None),

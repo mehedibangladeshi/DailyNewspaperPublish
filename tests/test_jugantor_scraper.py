@@ -214,3 +214,7 @@ def test_parse_article_missing_ldjson_still_returns_body():
 
 def test_get_cover_logo_url_returns_jugantor_masthead_logo():
     assert jugantor.get_cover_logo_url() == "https://cdn.jugantor.com/uploads/settings/logo-black.png"
+
+
+def test_format_date_uses_bengali_formatting():
+    assert jugantor.format_date("2026-08-17") == "১৭ আগস্ট, ২০২৬"

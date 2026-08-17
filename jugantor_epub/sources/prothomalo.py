@@ -6,7 +6,8 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 
-from .. import config
+from .. import bengali_date, config
+from .ld_json import select_by_type
 from .text_utils import extract_text as _text
 from .text_utils import normalize_text as _normalize
 
@@ -167,23 +168,6 @@ def list_articles(slug):
     return parse_articles(html)
 
 
-def _select_newsarticle_metadata(soup):
-    """Unlike Jugantor, the first ld+json block on a Prothom Alo article
-    page is a BreadcrumbList, not the article metadata - so each block must
-    be parsed and checked for @type == NewsArticle rather than just taking
-    the first one."""
-    for tag in soup.select('script[type="application/ld+json"]'):
-        try:
-            # strict=False: matches the defensive parsing used elsewhere for
-            # ld+json, in case string values contain raw literal newlines.
-            data = json.loads(tag.string or "{}", strict=False)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        if isinstance(data, dict) and data.get("@type") == "NewsArticle":
-            return data
-    return {}
-
-
 def _extract_author(author_field):
     # Prothom Alo's ld+json represents author as a list of Person dicts,
     # unlike Jugantor's single dict/string - take the first entry, then
@@ -202,7 +186,9 @@ def parse_article(html, url):
     """Pure parsing step for fetch_article; takes raw article-page HTML
     and the article's URL, returns the article detail dict."""
     soup = BeautifulSoup(html, "html.parser")
-    metadata = _select_newsarticle_metadata(soup)
+    # Unlike Jugantor, the first ld+json block on a Prothom Alo article page
+    # is a BreadcrumbList, not the article metadata.
+    metadata = select_by_type(soup, "NewsArticle")
 
     if metadata.get("isAccessibleForFree") is False:
         raise ValueError(f"Skipping subscriber-only article: {url}")
@@ -239,6 +225,10 @@ def fetch_article(url):
 
 def get_cover_logo_url():
     return COVER_LOGO_URL
+
+
+def format_date(edition_date):
+    return bengali_date.format_bengali_date(edition_date)
 
 
 def prepare_logo_image(image):
