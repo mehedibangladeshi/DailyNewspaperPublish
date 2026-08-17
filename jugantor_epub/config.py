@@ -22,7 +22,7 @@ IMAGE_JPEG_QUALITY = 75
 #   fetch_article(url) -> dict
 # Adding a new newspaper later means adding a module here with the same
 # shape and listing its name below - main.py already loops over this list.
-SOURCES = ["jugantor", "prothomalo"]
+SOURCES = ["jugantor", "prothomalo", "dhakatribune"]
 
 def _clean_env(name):
     """Strip whitespace, including non-breaking spaces copy-pasted from

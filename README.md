@@ -1,12 +1,13 @@
-# Bengali Newspapers → Kindle EPUB
+# Newspapers → Kindle EPUB
 
-Scrapes Bengali daily newspapers' web editions and builds a Kindle-ready
-`.epub` for each — organized by section (front page, sports, editorial, etc.),
-one article per page, with images and a properly embedded Bengali font (Noto
-Sans Bengali, SIL OFL) so the text renders correctly on-device. Currently
-covers [Jugantor](https://www.jugantor.com/todays-paper) and
-[Prothom Alo](https://www.prothomalo.com); each is a separate epub built from
-its own source module.
+Scrapes daily newspapers' web editions and builds a Kindle-ready `.epub` for
+each — organized by section (front page, sports, editorial, etc.), one
+article per page, with images and a properly embedded Bengali font (Noto
+Sans Bengali, SIL OFL) so Bengali text renders correctly on-device. Currently
+covers [Jugantor](https://www.jugantor.com/todays-paper),
+[Prothom Alo](https://www.prothomalo.com), and
+[Dhaka Tribune](https://www.dhakatribune.com) (English); each is a separate
+epub built from its own source module.
 
 ## Setup
 
@@ -23,8 +24,9 @@ python3 -m venv .venv
 
 This scrapes today's edition of every source in `config.SOURCES` and writes one
 `output/{slug}-YYYY-MM-DD.epub` per source (e.g. `output/jugantor-YYYY-MM-DD.epub`,
-`output/prothomalo-YYYY-MM-DD.epub`). Transfer those files to your Kindle (USB,
-or drag-and-drop into the Send-to-Kindle app / kindle.com library).
+`output/prothomalo-YYYY-MM-DD.epub`, `output/dhakatribune-YYYY-MM-DD.epub`).
+Transfer those files to your Kindle (USB, or drag-and-drop into the
+Send-to-Kindle app / kindle.com library).
 
 ## Project layout
 
@@ -34,14 +36,24 @@ or drag-and-drop into the Send-to-Kindle app / kindle.com library).
   independent from Jugantor's (different site architecture: category pages
   instead of a print-edition text site, listing data from an embedded JSON
   blob instead of DOM cards).
-- `jugantor_epub/sources/text_utils.py` — the only code shared between source
-  modules: paper-agnostic NFC Unicode-normalization helpers.
+- `jugantor_epub/sources/dhakatribune.py` — scraping logic for
+  dhakatribune.com, the first English-language source. DOM-card listings
+  (closer to Jugantor's approach) but a curated section allowlist, since its
+  nav is a full mega-menu rather than a flat category list.
+- `jugantor_epub/sources/text_utils.py` — paper-agnostic NFC
+  Unicode-normalization helpers, shared by every source module.
+- `jugantor_epub/sources/ld_json.py` — selects a `<script
+  type="application/ld+json">` block by its schema.org `@type`; several
+  sites bury the useful block behind an unrelated one, so "take the first
+  block" isn't safe in general.
 - `jugantor_epub/images.py` — downloads and resizes article images.
 - `jugantor_epub/cover.py` — renders the epub's cover image (masthead logo +
   edition date on a branded background), with a text-only fallback if the
-  logo can't be fetched.
-- `jugantor_epub/bengali_date.py` — formats an ISO date as Bengali digits +
-  month name, used on the cover and title page.
+  logo can't be fetched. Accent color, logo URL, an optional logo-cleanup
+  hook, and the date formatter are all supplied per source.
+- `jugantor_epub/bengali_date.py` / `jugantor_epub/english_date.py` — format
+  an ISO date as a Bengali or English display string; each source module
+  picks whichever matches its own language via `format_date()`.
 - `jugantor_epub/epub_builder.py` — assembles the scraped content into an epub
   via `ebooklib`, embedding the Bengali font and the cover.
 - `jugantor_epub/config.py` — tunables (output dir, request delay, image size,
@@ -57,12 +69,15 @@ or drag-and-drop into the Send-to-Kindle app / kindle.com library).
 ## Adding another newspaper
 
 Add a new module under `jugantor_epub/sources/` exposing the same functions as
-`jugantor.py`/`prothomalo.py` (`discover_sections()`, `list_articles(slug)`,
-`fetch_article(url)`, `get_cover_logo_url()`, plus `SOURCE_NAME` and
-`COVER_ACCENT_COLOR` constants), then add its module name to `config.SOURCES`.
-`main.py` already loops over that list, so no other code changes are needed.
-Keep each newspaper's parsing logic in its own module — only pull genuinely
-paper-agnostic code (like `text_utils.py`) into a shared file.
+the existing sources (`discover_sections()`, `list_articles(slug)`,
+`fetch_article(url)`, `get_cover_logo_url()`, `format_date(edition_date)`,
+plus `SOURCE_NAME` and `COVER_ACCENT_COLOR` constants), then add its module
+name to `config.SOURCES`. `main.py` already loops over that list, so no other
+code changes are needed. Keep each newspaper's parsing logic in its own
+module — only pull genuinely paper-agnostic code (like `text_utils.py`,
+`ld_json.py`, the date formatters) into a shared file. See
+`.claude/skills/add-news-source/` for the step-by-step process this project
+uses to research and add a new source.
 
 ## Daily Kindle delivery (GitHub Actions)
 
