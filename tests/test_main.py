@@ -37,6 +37,7 @@ def _no_real_opds_publish(monkeypatch):
 
 class _FakeSourceOk:
     SOURCE_NAME = "Fake Paper"
+    COVER_ACCENT_COLOR = (10, 20, 30)
 
     @staticmethod
     def discover_sections():
@@ -69,6 +70,7 @@ class _FakeSourceOk:
 
 class _FakeSourceOk2:
     SOURCE_NAME = "Fake Paper 2"
+    COVER_ACCENT_COLOR = (40, 50, 60)
 
     @staticmethod
     def discover_sections():
@@ -142,8 +144,8 @@ def test_build_source_edition_skips_failed_article_and_caches_image_downloads(mo
 def test_build_source_edition_passes_rendered_cover_to_build_epub(monkeypatch):
     render_calls = []
 
-    def fake_render_cover(source_name, date_text, logo_url):
-        render_calls.append((source_name, date_text, logo_url))
+    def fake_render_cover(source_name, date_text, logo_url, accent_color, prepare_logo=None):
+        render_calls.append((source_name, date_text, logo_url, accent_color, prepare_logo))
         return b"COVERBYTES"
 
     captured = {}
@@ -158,8 +160,33 @@ def test_build_source_edition_passes_rendered_cover_to_build_epub(monkeypatch):
 
     main.build_source_edition(_FakeSourceOk, "2026-08-10")
 
-    assert render_calls == [("Fake Paper", "১০ আগস্ট, ২০২৬", "https://x/logo.png")]
+    assert render_calls == [("Fake Paper", "১০ আগস্ট, ২০২৬", "https://x/logo.png", (10, 20, 30), None)]
     assert captured["cover_image_bytes"] == b"COVERBYTES"
+
+
+def test_build_source_edition_forwards_a_sources_prepare_logo_image_when_defined(monkeypatch):
+    """Sources that don't define prepare_logo_image (like Jugantor) pass
+    None, verified above; a source that does define one (like Prothom Alo)
+    must have it forwarded to cover.render_cover."""
+    render_calls = []
+
+    def fake_render_cover(source_name, date_text, logo_url, accent_color, prepare_logo=None):
+        render_calls.append(prepare_logo)
+        return b"COVERBYTES"
+
+    def fake_prepare_logo_image(image):
+        return image
+
+    class _FakeSourceWithLogoPrep(_FakeSourceOk):
+        prepare_logo_image = staticmethod(fake_prepare_logo_image)
+
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(main.cover, "render_cover", fake_render_cover)
+    monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/fake.epub")
+
+    main.build_source_edition(_FakeSourceWithLogoPrep, "2026-08-10")
+
+    assert render_calls == [fake_prepare_logo_image]
 
 
 def test_build_source_edition_builds_without_cover_when_render_cover_fails(monkeypatch):

@@ -65,6 +65,8 @@ def build_source_edition(source_module, edition_date, source_slug=None):
             source_module.SOURCE_NAME,
             bengali_date.format_bengali_date(edition_date),
             source_module.get_cover_logo_url(),
+            source_module.COVER_ACCENT_COLOR,
+            prepare_logo=getattr(source_module, "prepare_logo_image", None),
         )
     except Exception as exc:
         logger.warning("Could not render cover for %s: %s", source_module.SOURCE_NAME, exc)

@@ -1,10 +1,12 @@
-# Jugantor Todays-Paper → Kindle EPUB
+# Bengali Newspapers → Kindle EPUB
 
-Scrapes the Bengali daily newspaper [Jugantor](https://www.jugantor.com/todays-paper)'s
-web edition and builds a Kindle-ready `.epub` of the day's paper — organized by
-section (front page, sports, editorial, etc.), one article per page, with images
-and a properly embedded Bengali font (Noto Sans Bengali, SIL OFL) so the text
-renders correctly on-device.
+Scrapes Bengali daily newspapers' web editions and builds a Kindle-ready
+`.epub` for each — organized by section (front page, sports, editorial, etc.),
+one article per page, with images and a properly embedded Bengali font (Noto
+Sans Bengali, SIL OFL) so the text renders correctly on-device. Currently
+covers [Jugantor](https://www.jugantor.com/todays-paper) and
+[Prothom Alo](https://www.prothomalo.com); each is a separate epub built from
+its own source module.
 
 ## Setup
 
@@ -19,14 +21,21 @@ python3 -m venv .venv
 .venv/bin/python main.py
 ```
 
-This scrapes today's edition and writes `output/jugantor-YYYY-MM-DD.epub`.
-Transfer that file to your Kindle (USB, or drag-and-drop into the Send-to-Kindle
-app / kindle.com library).
+This scrapes today's edition of every source in `config.SOURCES` and writes one
+`output/{slug}-YYYY-MM-DD.epub` per source (e.g. `output/jugantor-YYYY-MM-DD.epub`,
+`output/prothomalo-YYYY-MM-DD.epub`). Transfer those files to your Kindle (USB,
+or drag-and-drop into the Send-to-Kindle app / kindle.com library).
 
 ## Project layout
 
 - `jugantor_epub/sources/jugantor.py` — scraping logic for jugantor.com (section
   discovery, article listing, article detail + metadata).
+- `jugantor_epub/sources/prothomalo.py` — scraping logic for prothomalo.com,
+  independent from Jugantor's (different site architecture: category pages
+  instead of a print-edition text site, listing data from an embedded JSON
+  blob instead of DOM cards).
+- `jugantor_epub/sources/text_utils.py` — the only code shared between source
+  modules: paper-agnostic NFC Unicode-normalization helpers.
 - `jugantor_epub/images.py` — downloads and resizes article images.
 - `jugantor_epub/cover.py` — renders the epub's cover image (masthead logo +
   edition date on a branded background), with a text-only fallback if the
@@ -45,13 +54,15 @@ app / kindle.com library).
 - `main.py` — CLI entrypoint; runs the full pipeline for every source listed in
   `config.SOURCES`.
 
-## Adding another newspaper later
+## Adding another newspaper
 
 Add a new module under `jugantor_epub/sources/` exposing the same functions as
-`jugantor.py` (`discover_sections()`, `list_articles(slug)`, `fetch_article(url)`,
-`get_cover_logo_url()`, plus a `SOURCE_NAME` constant), then add its module name
-to `config.SOURCES`. `main.py` already loops over that list, so no other code
-changes are needed.
+`jugantor.py`/`prothomalo.py` (`discover_sections()`, `list_articles(slug)`,
+`fetch_article(url)`, `get_cover_logo_url()`, plus `SOURCE_NAME` and
+`COVER_ACCENT_COLOR` constants), then add its module name to `config.SOURCES`.
+`main.py` already loops over that list, so no other code changes are needed.
+Keep each newspaper's parsing logic in its own module — only pull genuinely
+paper-agnostic code (like `text_utils.py`) into a shared file.
 
 ## Daily Kindle delivery (GitHub Actions)
 

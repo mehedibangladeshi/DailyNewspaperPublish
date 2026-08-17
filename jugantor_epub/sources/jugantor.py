@@ -1,32 +1,21 @@
 import json
 import logging
 import time
-import unicodedata
 from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
 from .. import config
+from .text_utils import extract_text as _text
+from .text_utils import normalize_text as _normalize
 
 logger = logging.getLogger(__name__)
-
-
-def _text(tag, default=""):
-    """Extract normalized text from a tag. The site mixes NFC/NFD forms
-    for Bengali nukta characters (e.g. ড় vs ড়) across
-    different fields, so normalize to NFC for consistent rendering/comparison."""
-    if tag is None:
-        return default
-    return unicodedata.normalize("NFC", tag.get_text(" ", strip=True))
-
-
-def _normalize(text):
-    return unicodedata.normalize("NFC", text or "")
 
 BASE_URL = "https://www.jugantor.com"
 TODAYS_PAPER_URL = f"{BASE_URL}/todays-paper"
 COVER_LOGO_URL = "https://cdn.jugantor.com/uploads/settings/logo-black.png"
+COVER_ACCENT_COLOR = (196, 12, 19)  # jugantor.com's brand red, #c40c13
 
 SOURCE_NAME = "যুগান্তর"
 
