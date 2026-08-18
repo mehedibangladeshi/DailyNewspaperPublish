@@ -99,7 +99,7 @@ def test_list_articles_fetches_then_parses(monkeypatch, load_fixture):
 
     monkeypatch.setattr(prothomalo, "_get", fake_get)
 
-    articles = prothomalo.list_articles("bangladesh")
+    articles = prothomalo.list_articles("bangladesh", "2026-08-17")
 
     assert seen_urls == ["https://www.prothomalo.com/bangladesh"]
     assert len(articles) > 0
@@ -119,7 +119,7 @@ def test_parse_articles_extracts_stories_and_dedupes_from_nested_collection_json
     recursive Quintype collection tree embedded as JSON, where the same
     story commonly appears under more than one widget."""
     html = load_fixture("prothomalo_section_bangladesh.html")
-    articles = prothomalo.parse_articles(html)
+    articles = prothomalo.parse_articles(html, "2026-08-17")
 
     assert len(articles) > 0
     urls = [a["url"] for a in articles]
@@ -132,7 +132,7 @@ def test_parse_articles_extracts_stories_and_dedupes_from_nested_collection_json
 
 
 def test_parse_articles_returns_empty_list_when_static_page_script_missing():
-    assert prothomalo.parse_articles("<html><body>no static-page script here</body></html>") == []
+    assert prothomalo.parse_articles("<html><body>no static-page script here</body></html>", "2026-08-17") == []
 
 
 def test_parse_articles_handles_invalid_json_syntax():
@@ -141,7 +141,7 @@ def test_parse_articles_handles_invalid_json_syntax():
       <script type="application/json" id="static-page">{not valid json at all</script>
     </body></html>
     """
-    assert prothomalo.parse_articles(html) == []
+    assert prothomalo.parse_articles(html, "2026-08-17") == []
 
 
 def test_parse_articles_handles_missing_hero_image():
@@ -168,7 +168,7 @@ def test_parse_articles_handles_missing_hero_image():
       <script type="application/json" id="static-page">{json.dumps(payload)}</script>
     </body></html>
     """
-    articles = prothomalo.parse_articles(html)
+    articles = prothomalo.parse_articles(html, "2026-08-17")
 
     assert len(articles) == 1
     assert articles[0]["thumbnail"] is None

@@ -121,12 +121,13 @@ def _find_stories(node, seen_urls, out):
             _find_stories(item, seen_urls, out)
 
 
-def parse_articles(html):
-    """Pure parsing step for list_articles; takes raw section-page HTML.
-    Unlike Jugantor, the listing data isn't in scrapeable DOM cards - it's
-    embedded as a <script type="application/json" id="static-page"> blob
-    (Quintype CMS's hydration state), so this parses that JSON instead of
-    selecting HTML cards."""
+def parse_articles(html, edition_date):
+    """Pure parsing step for list_articles; takes raw section-page HTML and
+    the run's edition_date (ISO "YYYY-MM-DD" string). Unlike Jugantor, the
+    listing data isn't in scrapeable DOM cards - it's embedded as a
+    <script type="application/json" id="static-page"> blob (Quintype CMS's
+    hydration state), so this parses that JSON instead of selecting HTML
+    cards."""
     soup = BeautifulSoup(html, "html.parser")
     script_tag = soup.select_one("script#static-page")
     if script_tag is None:
@@ -162,10 +163,10 @@ def parse_articles(html):
     return articles
 
 
-def list_articles(slug):
+def list_articles(slug, edition_date):
     section_url = f"{BASE_URL}/{slug}"
     html = _get(section_url)
-    return parse_articles(html)
+    return parse_articles(html, edition_date)
 
 
 def _extract_author(author_field):

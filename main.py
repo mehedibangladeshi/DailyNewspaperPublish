@@ -22,7 +22,7 @@ def build_source_edition(source_module, edition_date, source_slug=None):
 
     for slug, section_name in source_module.discover_sections():
         try:
-            listing = source_module.list_articles(slug)
+            listing = source_module.list_articles(slug, edition_date)
         except Exception as exc:
             logger.warning("Skipping section %s (%s): %s", slug, section_name, exc)
             continue

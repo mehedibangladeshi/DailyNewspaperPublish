@@ -136,7 +136,7 @@ def parse_articles(html):
     return articles
 
 
-def list_articles(slug):
+def list_articles(slug, edition_date=None):
     section_url = f"{BASE_URL}/{slug}"
     html = _get(section_url)
     return parse_articles(html)

@@ -44,7 +44,7 @@ class _FakeSourceOk:
         return [("sec1", "Section One")]
 
     @staticmethod
-    def list_articles(slug):
+    def list_articles(slug, edition_date):
         return [
             {"url": "https://x/1", "headline": "H1", "thumbnail": "https://img/shared.jpg"},
             {"url": "https://x/err", "headline": "H-err", "thumbnail": None},
@@ -81,7 +81,7 @@ class _FakeSourceOk2:
         return [("sec1", "Section One")]
 
     @staticmethod
-    def list_articles(slug):
+    def list_articles(slug, edition_date):
         return [{"url": "https://x/2", "headline": "H2", "thumbnail": None}]
 
     @staticmethod
@@ -111,7 +111,7 @@ class _FakeSourceAllFail:
         return [("sec1", "Section One")]
 
     @staticmethod
-    def list_articles(slug):
+    def list_articles(slug, edition_date):
         raise RuntimeError("site is down")
 
     @staticmethod
