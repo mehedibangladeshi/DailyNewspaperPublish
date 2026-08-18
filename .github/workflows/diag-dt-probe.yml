@@ -1,0 +1,35 @@
+name: Diagnostic - Dhaka Tribune 403 probe
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: curl homepage
+        run: |
+          curl -sS -D - -o /tmp/home.html \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            https://www.dhakatribune.com || true
+          echo "--- body (first 3000 bytes) ---"
+          head -c 3000 /tmp/home.html || true
+      - name: curl section page
+        run: |
+          curl -sS -D - -o /tmp/section.html \
+            -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            https://www.dhakatribune.com/bangladesh || true
+          echo "--- body (first 3000 bytes) ---"
+          head -c 3000 /tmp/section.html || true
+      - name: python requests, same as scraper
+        run: |
+          python3 -c "
+          import requests
+          s = requests.Session()
+          s.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'})
+          r = s.get('https://www.dhakatribune.com/bangladesh', timeout=15)
+          print('STATUS', r.status_code)
+          print('HEADERS', dict(r.headers))
+          print('BODY', r.text[:2000])
+          "
+      - name: runner egress IP
+        run: curl -sS https://ifconfig.me || true
