@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime, timezone
 
 import pytest
 
@@ -302,12 +302,12 @@ def test_main_sends_combined_email_with_every_built_source(monkeypatch):
         main.email_sender, "send_to_kindle", lambda *a, **k: sent.append(a)
     )
 
-    class _FixedDate(date):
+    class _FixedDatetime(datetime):
         @classmethod
-        def today(cls):
-            return date(2026, 8, 10)
+        def now(cls, tz=None):
+            return datetime(2026, 8, 10, 12, 0, tzinfo=tz or timezone.utc)
 
-    monkeypatch.setattr(main, "date", _FixedDate)
+    monkeypatch.setattr(main, "datetime", _FixedDatetime)
 
     exit_code = main.main()
 
@@ -364,12 +364,12 @@ def test_main_publishes_opds_catalog_when_enabled(monkeypatch):
         main.opds_publish, "publish_catalog", lambda *a, **k: published.append(a)
     )
 
-    class _FixedDate(date):
+    class _FixedDatetime(datetime):
         @classmethod
-        def today(cls):
-            return date(2026, 8, 10)
+        def now(cls, tz=None):
+            return datetime(2026, 8, 10, 12, 0, tzinfo=tz or timezone.utc)
 
-    monkeypatch.setattr(main, "date", _FixedDate)
+    monkeypatch.setattr(main, "datetime", _FixedDatetime)
 
     exit_code = main.main()
 

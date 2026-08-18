@@ -1,12 +1,15 @@
 import importlib
 import logging
 import sys
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from jugantor_epub import config, cover, email_sender, epub_builder, images, opds_publish
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
+
+DHAKA_TZ = ZoneInfo("Asia/Dhaka")
 
 
 def build_source_edition(source_module, edition_date, source_slug=None):
@@ -92,7 +95,7 @@ def build_source_edition(source_module, edition_date, source_slug=None):
 
 
 def main():
-    edition_date = date.today().isoformat()
+    edition_date = datetime.now(DHAKA_TZ).date().isoformat()
     built = []
     for source_slug in config.SOURCES:
         source_module = importlib.import_module(f"jugantor_epub.sources.{source_slug}")
