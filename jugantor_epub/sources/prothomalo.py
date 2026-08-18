@@ -1,7 +1,9 @@
 import json
 import logging
 import time
+from datetime import date, datetime
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -31,6 +33,12 @@ LOGO_BACKGROUND_RGB = (245, 245, 245)
 LOGO_BACKGROUND_TOLERANCE = 12
 
 SOURCE_NAME = "প্রথম আলো"
+
+# Prothom Alo is Bangladesh's paper, so "today" for date-filtering purposes
+# means the Asia/Dhaka calendar day, regardless of what timezone this
+# process happens to run in (main.py's edition_date is computed once, in
+# whatever local time the run has, and is compared against here).
+DHAKA_TZ = ZoneInfo("Asia/Dhaka")
 
 # Used only if live discovery finds nothing (defensive fallback). Unlike
 # Jugantor, Prothom Alo has no separate print-edition site - these are its
@@ -121,13 +129,33 @@ def _find_stories(node, seen_urls, out):
             _find_stories(item, seen_urls, out)
 
 
+def _story_date(published_at):
+    """Convert a Quintype `published-at` epoch-ms timestamp to its
+    Asia/Dhaka calendar date. Returns None if the value is missing or
+    malformed - callers should fail open (keep the story) rather than drop
+    it, since this is a newly-relied-on field with no track record yet of
+    being reliably present across every section's JSON shape."""
+    if not isinstance(published_at, (int, float)):
+        return None
+    try:
+        return datetime.fromtimestamp(published_at / 1000, tz=DHAKA_TZ).date()
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 def parse_articles(html, edition_date):
     """Pure parsing step for list_articles; takes raw section-page HTML and
     the run's edition_date (ISO "YYYY-MM-DD" string). Unlike Jugantor, the
     listing data isn't in scrapeable DOM cards - it's embedded as a
     <script type="application/json" id="static-page"> blob (Quintype CMS's
     hydration state), so this parses that JSON instead of selecting HTML
-    cards."""
+    cards.
+
+    Unlike Jugantor's print-edition pages, a category page has no natural
+    "today only" bound - it's a rolling feed of recent stories regardless of
+    date. Each story carries its own published-at epoch-ms timestamp, so
+    this filters to stories whose Asia/Dhaka calendar date matches
+    edition_date, dropping the rest before any per-article fetch happens."""
     soup = BeautifulSoup(html, "html.parser")
     script_tag = soup.select_one("script#static-page")
     if script_tag is None:
@@ -143,8 +171,21 @@ def parse_articles(html, edition_date):
     stories = []
     _find_stories(collection.get("items") or [], set(), stories)
 
+    target_date = date.fromisoformat(edition_date)
+    warned_missing_date = False
+
     articles = []
     for story in stories:
+        story_date = _story_date(story.get("published-at"))
+        if story_date is not None and story_date != target_date:
+            continue
+        if story_date is None and not warned_missing_date:
+            logger.warning(
+                "Story listing missing/invalid published-at, keeping it: %s",
+                story.get("url"),
+            )
+            warned_missing_date = True
+
         thumbnail = None
         s3_key = story.get("hero-image-s3-key")
         if s3_key:

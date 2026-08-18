@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 import pytest
 import requests
@@ -172,6 +173,64 @@ def test_parse_articles_handles_missing_hero_image():
 
     assert len(articles) == 1
     assert articles[0]["thumbnail"] is None
+
+
+def test_parse_articles_filters_to_stories_published_on_edition_date(load_fixture):
+    """The bangladesh fixture has 35 raw story listings, but 5 are
+    duplicates (same url reused across widgets) that _find_stories already
+    collapses to their first occurrence before date-filtering runs, leaving
+    30 distinct stories split 22/8 across 2026-08-17 and 2026-08-16
+    (Asia/Dhaka calendar dates, verified directly against this fixture's
+    published-at values with dedup-then-filter applied, matching this
+    module's actual dedup-before-filter order)."""
+    html = load_fixture("prothomalo_section_bangladesh.html")
+
+    articles_17 = prothomalo.parse_articles(html, "2026-08-17")
+    articles_16 = prothomalo.parse_articles(html, "2026-08-16")
+
+    assert len(articles_17) == 22
+    assert len(articles_16) == 8
+
+
+def test_parse_articles_keeps_story_with_missing_published_at():
+    payload = {
+        "qt": {
+            "data": {
+                "collection": {
+                    "items": [
+                        {
+                            "type": "story",
+                            "story": {
+                                "headline": "No timestamp here",
+                                "subheadline": "sub",
+                                "url": "https://www.prothomalo.com/world/no-date",
+                            },
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    html = f"""
+    <html><body>
+      <script type="application/json" id="static-page">{json.dumps(payload)}</script>
+    </body></html>
+    """
+
+    articles = prothomalo.parse_articles(html, "2026-08-17")
+
+    assert len(articles) == 1
+    assert articles[0]["url"] == "https://www.prothomalo.com/world/no-date"
+
+
+def test_story_date_converts_epoch_ms_to_asia_dhaka_date():
+    # 1786947241293 ms -> 2026-08-17 05:14:01 in Asia/Dhaka (UTC+6)
+    assert prothomalo._story_date(1786947241293) == date(2026, 8, 17)
+
+
+def test_story_date_returns_none_for_missing_or_invalid_value():
+    assert prothomalo._story_date(None) is None
+    assert prothomalo._story_date("not-a-timestamp") is None
 
 
 def test_parse_article_extracts_metadata_and_body(load_fixture):
