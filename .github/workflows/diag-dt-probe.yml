@@ -33,3 +33,23 @@ jobs:
           "
       - name: runner egress IP
         run: curl -sS https://ifconfig.me || true
+      - name: playwright headless browser attempt
+        run: |
+          pip install playwright
+          python3 -m playwright install --with-deps chromium
+          python3 -c "
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page(user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+              resp = page.goto('https://www.dhakatribune.com/bangladesh', wait_until='domcontentloaded', timeout=20000)
+              print('initial status', resp.status if resp else None)
+              page.wait_for_timeout(8000)
+              print('title after wait:', page.title())
+              print('url after wait:', page.url)
+              html = page.content()
+              print('HTML length', len(html))
+              print('has each-card marker:', 'div class=\"each' in html or 'jw_detail_content_body' in html)
+              print(html[:1500])
+              browser.close()
+          "
