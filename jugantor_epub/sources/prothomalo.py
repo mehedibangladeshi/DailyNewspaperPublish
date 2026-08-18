@@ -43,6 +43,9 @@ DHAKA_TZ = ZoneInfo("Asia/Dhaka")
 # Used only if live discovery finds nothing (defensive fallback). Unlike
 # Jugantor, Prothom Alo has no separate print-edition site - these are its
 # regular web nav categories, discovered from the homepage's #navbar.
+# "video" and "chakri" are deliberately excluded here (see
+# EXCLUDED_SECTION_SLUGS below) - Kindle can't play video, and job listings
+# aren't news narrative the way the rest of the paper is.
 FALLBACK_SECTIONS = [
     ("bangladesh", "বাংলাদেশ"),
     ("politics", "রাজনীতি"),
@@ -51,10 +54,17 @@ FALLBACK_SECTIONS = [
     ("opinion", "মতামত"),
     ("sports", "খেলা"),
     ("entertainment", "বিনোদন"),
-    ("chakri", "চাকরি"),
     ("lifestyle", "জীবনযাপন"),
-    ("video", "ভিডিও"),
 ]
+
+# Nav categories that are discovered live (via parse_sections) or would
+# otherwise appear in FALLBACK_SECTIONS, but don't fit a daily reading
+# digest: "video" is a format Kindle can't play (a video-story page's body
+# is a player + caption, not prose), and "chakri" (jobs/classifieds) isn't
+# news narrative. Same "curated allowlist over generic filter" spirit as
+# Dhaka Tribune's CORE_SECTION_SLUGS, expressed as a denylist since only
+# two of Prothom Alo's ~10 nav categories need excluding.
+EXCLUDED_SECTION_SLUGS = {"video", "chakri"}
 
 _session = config.make_session()
 
@@ -83,7 +93,7 @@ def parse_sections(html):
         # naturally excludes /collection/latest, /search, oauth links, etc.
         if not path or "/" in path:
             continue
-        if path in seen_slugs:
+        if path in seen_slugs or path in EXCLUDED_SECTION_SLUGS:
             continue
         name = _normalize(link.get("aria-label") or link.get_text(strip=True))
         if not name:

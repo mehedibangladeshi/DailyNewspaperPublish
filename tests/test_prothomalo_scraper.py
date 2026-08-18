@@ -91,6 +91,26 @@ def test_discover_sections_returns_live_parsed_sections(monkeypatch, load_fixtur
     assert ("bangladesh", "বাংলাদেশ") in sections
 
 
+def test_parse_sections_excludes_video_and_chakri():
+    html = """
+    <div id="navbar">
+      <a aria-label="বাংলাদেশ" href="https://www.prothomalo.com/bangladesh">বাংলাদেশ</a>
+      <a aria-label="ভিডিও" href="https://www.prothomalo.com/video">ভিডিও</a>
+      <a aria-label="চাকরি" href="https://www.prothomalo.com/chakri">চাকরি</a>
+    </div>
+    """
+    sections = prothomalo.parse_sections(html)
+
+    slugs = [slug for slug, _ in sections]
+    assert slugs == ["bangladesh"]
+
+
+def test_fallback_sections_excludes_video_and_chakri():
+    slugs = [slug for slug, _ in prothomalo.FALLBACK_SECTIONS]
+    assert "video" not in slugs
+    assert "chakri" not in slugs
+
+
 def test_list_articles_fetches_then_parses(monkeypatch, load_fixture):
     seen_urls = []
 
