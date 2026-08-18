@@ -4,15 +4,20 @@ on:
     - cron: '0 2 * * *'   # 02:00 UTC = 08:00 BD time (UTC+6, no DST)
   workflow_dispatch:
 
+concurrency:
+  group: daily-kindle
+  cancel-in-progress: false
+
 jobs:
   build-and-send:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     env:
       GH_PAGES_DIR: gh-pages-checkout
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: gh_pages_exists
         run: |
           set +e
@@ -29,11 +34,11 @@ jobs:
       - id: gh_pages_checkout
         if: steps.gh_pages_exists.outputs.exists == 'true'
         continue-on-error: true
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: gh-pages
           path: ${{ env.GH_PAGES_DIR }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - run: pip install -r requirements.txt
@@ -44,16 +49,20 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
           PUBLISH_OPDS: 'true'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: jugantor-epub-${{ github.run_id }}
           path: output/*.epub
           retention-days: 7
-      - uses: peaceiris/actions-gh-pages@v3
+      - uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         if: always() && (steps.gh_pages_exists.outputs.exists == 'false' || steps.gh_pages_checkout.outcome == 'success')
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ${{ env.GH_PAGES_DIR }}
           keep_files: false
           force_orphan: true
+      - if: always() && steps.gh_pages_exists.outputs.exists == 'true' && steps.gh_pages_checkout.outcome == 'failure'
+        run: |
+          echo "::error::gh-pages checkout failed for a reason other than a missing branch; OPDS catalog was NOT republished this run (still serving the previous version)."
+          exit 1
