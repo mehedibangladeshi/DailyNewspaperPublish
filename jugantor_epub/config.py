@@ -18,7 +18,7 @@ IMAGE_JPEG_QUALITY = 75
 
 # Each entry is a module under jugantor_epub/sources/ exposing:
 #   discover_sections() -> list[(slug, section_name)]
-#   list_articles(slug) -> list[dict]
+#   list_articles(slug, edition_date) -> list[dict]
 #   fetch_article(url) -> dict
 # Adding a new newspaper later means adding a module here with the same
 # shape and listing its name below - main.py already loops over this list.

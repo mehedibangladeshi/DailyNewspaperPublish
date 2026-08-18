@@ -69,7 +69,7 @@ Send-to-Kindle app / kindle.com library).
 ## Adding another newspaper
 
 Add a new module under `jugantor_epub/sources/` exposing the same functions as
-the existing sources (`discover_sections()`, `list_articles(slug)`,
+the existing sources (`discover_sections()`, `list_articles(slug, edition_date)`,
 `fetch_article(url)`, `get_cover_logo_url()`, `format_date(edition_date)`,
 plus `SOURCE_NAME` and `COVER_ACCENT_COLOR` constants), then add its module
 name to `config.SOURCES`. `main.py` already loops over that list, so no other

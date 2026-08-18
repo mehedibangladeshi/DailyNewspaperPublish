@@ -104,10 +104,18 @@ COVER_ACCENT_COLOR = (r, g, b)   # used for the cover's accent rule
 FALLBACK_SECTIONS = [(slug, name), ...]  # defensive fallback list
 
 def discover_sections() -> list[(slug, name)]: ...
-def list_articles(slug) -> list[dict]: ...        # keys: url, headline, summary, listing_time, thumbnail
+def list_articles(slug, edition_date) -> list[dict]: ...  # keys: url, headline, summary, listing_time, thumbnail
 def fetch_article(url) -> dict: ...               # keys: url, headline, author, date_published, image_url, paragraphs
 def get_cover_logo_url() -> str: ...
 ```
+
+`edition_date` is the same ISO `"YYYY-MM-DD"` string `main.py` computes once
+per run. A new source may simply accept-and-ignore it via an
+`edition_date=None` default if its listings are inherently single-day
+already (matching how Jugantor and Dhaka Tribune do it) - only sources whose
+listings are NOT inherently bounded to one day (like Prothom Alo, whose
+category pages are a rolling recent-stories feed) need to actually use it to
+filter listings down to that day's stories.
 
 Optional: `def prepare_logo_image(image: PIL.Image) -> PIL.Image` - called
 by `cover.render_cover` on the freshly-fetched logo before compositing, if
@@ -116,7 +124,7 @@ Alo's implementation for the pattern: crop to a fixed box, then make a
 near-white background transparent by per-pixel threshold).
 
 Keep the same **parse/fetch split** as the existing modules: a thin
-`fetch_article(url)`/`list_articles(slug)`/`discover_sections()` wrapper
+`fetch_article(url)`/`list_articles(slug, edition_date)`/`discover_sections()` wrapper
 that does the HTTP GET via a shared `_get()` helper, delegating to a pure
 `parse_article(html, url)`/`parse_articles(html)`/`parse_sections(html)`
 function that takes raw HTML/JSON and returns plain dicts - this is what
