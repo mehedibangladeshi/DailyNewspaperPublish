@@ -110,12 +110,12 @@ def main():
     exit_code = 0
     if config.SEND_TO_KINDLE:
         try:
-            email_sender.send_to_kindle(built, edition_date)
+            sent_count = email_sender.send_to_kindle(built, edition_date)
         except Exception as exc:
-            logger.error("Failed to send combined edition to Kindle: %s", exc)
+            logger.error("Failed to send editions to Kindle: %s", exc)
             exit_code = 1
         else:
-            logger.info("Sent %d edition(s) to Kindle.", len(built))
+            logger.info("Sent %d of %d edition(s) to Kindle.", sent_count, len(built))
 
     if config.PUBLISH_OPDS:
         try:
