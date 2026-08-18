@@ -17,6 +17,14 @@ def select_by_type(soup, type_name):
             data = json.loads(tag.string or "{}", strict=False)
         except (json.JSONDecodeError, TypeError):
             continue
-        if isinstance(data, dict) and data.get("@type") == type_name:
+        if not isinstance(data, dict):
+            continue
+        if data.get("@type") == type_name:
             return data
+        # Some sites (e.g. Daily Star's Drupal setup) bundle every entity
+        # for the page into one block via a schema.org "@graph" array
+        # instead of emitting separate <script> blocks per type.
+        for item in data.get("@graph") or []:
+            if isinstance(item, dict) and item.get("@type") == type_name:
+                return item
     return {}

@@ -42,14 +42,22 @@ FALLBACK_TITLE_FONT_SIZE = 140
 
 def _fetch_logo_image(url):
     """Fetch a masthead logo and return it as an RGBA PIL Image, or None if
-    it can't be fetched or decoded."""
+    it can't be fetched or decoded. `url` may be an http(s) URL (fetched
+    over the network, the common case) or a local file path (for a source
+    whose only usable logo asset is bundled in the repo, e.g. a hand-
+    converted SVG-derived PNG that has no live PNG/JPEG equivalent)."""
     if not url:
         return None
 
     try:
-        response = _session.get(url, timeout=config.REQUEST_TIMEOUT)
-        response.raise_for_status()
-        return Image.open(io.BytesIO(response.content)).convert("RGBA")
+        if url.startswith(("http://", "https://")):
+            response = _session.get(url, timeout=config.REQUEST_TIMEOUT)
+            response.raise_for_status()
+            image_bytes = response.content
+        else:
+            with open(url, "rb") as fh:
+                image_bytes = fh.read()
+        return Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     except (requests.RequestException, OSError) as exc:
         logger.warning("Skipping cover logo %s: %s", url, exc)
         return None

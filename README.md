@@ -5,9 +5,10 @@ each — organized by section (front page, sports, editorial, etc.), one
 article per page, with images and a properly embedded Bengali font (Noto
 Sans Bengali, SIL OFL) so Bengali text renders correctly on-device. Currently
 covers [Jugantor](https://www.jugantor.com/todays-paper),
-[Prothom Alo](https://www.prothomalo.com), and
-[Dhaka Tribune](https://www.dhakatribune.com) (English); each is a separate
-epub built from its own source module.
+[Prothom Alo](https://www.prothomalo.com),
+[Dhaka Tribune](https://www.dhakatribune.com), and
+[The Daily Star](https://www.thedailystar.net/todays-news) (English); each is
+a separate epub built from its own source module.
 
 ## Setup
 
@@ -24,7 +25,8 @@ python3 -m venv .venv
 
 This scrapes today's edition of every source in `config.SOURCES` and writes one
 `output/{slug}-YYYY-MM-DD.epub` per source (e.g. `output/jugantor-YYYY-MM-DD.epub`,
-`output/prothomalo-YYYY-MM-DD.epub`, `output/dhakatribune-YYYY-MM-DD.epub`).
+`output/prothomalo-YYYY-MM-DD.epub`, `output/dhakatribune-YYYY-MM-DD.epub`,
+`output/dailystar-YYYY-MM-DD.epub`).
 Transfer those files to your Kindle (USB, or drag-and-drop into the
 Send-to-Kindle app / kindle.com library).
 
@@ -40,17 +42,29 @@ Send-to-Kindle app / kindle.com library).
   dhakatribune.com, the first English-language source. DOM-card listings
   (closer to Jugantor's approach) but a curated section allowlist, since its
   nav is a full mega-menu rather than a flat category list.
+- `jugantor_epub/sources/dailystar.py` — scraping logic for
+  thedailystar.net. Structurally different from every other source: there's
+  no per-category listing page at all, just one `/todays-news` page holding
+  every story published that day, so "section" is derived from each
+  article's own URL instead of a real nav category, and a per-run cache
+  keeps `discover_sections()`/`list_articles()` from re-fetching that same
+  page once per section. Its masthead logo is also bundled locally
+  (`jugantor_epub/assets/`) instead of fetched over the network, since the
+  live site's only real logo asset is an SVG (`Pillow` can't decode it).
 - `jugantor_epub/sources/text_utils.py` — paper-agnostic NFC
   Unicode-normalization helpers, shared by every source module.
 - `jugantor_epub/sources/ld_json.py` — selects a `<script
   type="application/ld+json">` block by its schema.org `@type`; several
-  sites bury the useful block behind an unrelated one, so "take the first
-  block" isn't safe in general.
+  sites bury the useful block behind an unrelated one (or, for Daily Star,
+  bundle every type into one block via a schema.org `@graph` array), so
+  "take the first block" isn't safe in general.
 - `jugantor_epub/images.py` — downloads and resizes article images.
 - `jugantor_epub/cover.py` — renders the epub's cover image (masthead logo +
   edition date on a branded background), with a text-only fallback if the
-  logo can't be fetched. Accent color, logo URL, an optional logo-cleanup
-  hook, and the date formatter are all supplied per source.
+  logo can't be fetched. Accent color, logo URL (an http(s) URL fetched
+  over the network, or a local file path for a source whose only usable
+  logo asset is bundled in the repo), an optional logo-cleanup hook, and
+  the date formatter are all supplied per source.
 - `jugantor_epub/bengali_date.py` / `jugantor_epub/english_date.py` — format
   an ISO date as a Bengali or English display string; each source module
   picks whichever matches its own language via `format_date()`.
@@ -75,7 +89,11 @@ plus `SOURCE_NAME` and `COVER_ACCENT_COLOR` constants), then add its module
 name to `config.SOURCES`. `main.py` already loops over that list, so no other
 code changes are needed. Keep each newspaper's parsing logic in its own
 module — only pull genuinely paper-agnostic code (like `text_utils.py`,
-`ld_json.py`, the date formatters) into a shared file. See
+`ld_json.py`, the date formatters) into a shared file. `get_cover_logo_url()`
+normally returns an http(s) URL fetched over the network, but can instead
+return a local file path if the site has no usable network logo asset (see
+`dailystar.py`, whose only real logo is an SVG `Pillow` can't decode) —
+`cover._fetch_logo_image()` reads any non-`http(s)` string from disk. See
 `.claude/skills/add-news-source/` for the step-by-step process this project
 uses to research and add a new source.
 

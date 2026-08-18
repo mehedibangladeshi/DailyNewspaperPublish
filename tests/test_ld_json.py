@@ -60,3 +60,37 @@ def test_select_by_type_skips_non_dict_json_values():
     soup = BeautifulSoup(html, "html.parser")
 
     assert ld_json.select_by_type(soup, "NewsArticle") == {}
+
+
+def test_select_by_type_finds_block_inside_graph_array():
+    """Regression: Daily Star's Drupal setup bundles every entity for the
+    page into one block via a schema.org "@graph" array instead of emitting
+    separate <script> blocks per type."""
+    html = """
+    <script type="application/ld+json">
+    {"@context": "https://schema.org", "@graph": [
+      {"@type": "NewsArticle", "headline": "H"},
+      {"@type": "Organization", "name": "Publisher"}
+    ]}
+    </script>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    result = ld_json.select_by_type(soup, "NewsArticle")
+
+    assert result == {"@type": "NewsArticle", "headline": "H"}
+
+
+def test_select_by_type_prefers_top_level_type_over_graph():
+    html = """
+    <script type="application/ld+json">
+    {"@type": "NewsArticle", "headline": "Top level", "@graph": [
+      {"@type": "NewsArticle", "headline": "Nested"}
+    ]}
+    </script>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    result = ld_json.select_by_type(soup, "NewsArticle")
+
+    assert result.get("headline") == "Top level"

@@ -143,6 +143,31 @@ def test_fetch_logo_image_returns_none_when_url_is_falsy():
     assert cover._fetch_logo_image("") is None
 
 
+def test_fetch_logo_image_reads_local_file_path_without_network_call(tmp_path, monkeypatch):
+    """Regression: Daily Star's only usable logo asset is bundled in the
+    repo (its live masthead is SVG-only) rather than fetched over the
+    network like every other source's logo - a non-http(s) string must be
+    read from disk instead of going through the HTTP session."""
+
+    def _boom(url, timeout):
+        raise AssertionError("must not make a network call for a local path")
+
+    monkeypatch.setattr(cover._session, "get", _boom)
+
+    png_path = tmp_path / "logo.png"
+    png_path.write_bytes(_opaque_rgba_png_bytes(500, 109, (10, 20, 30, 255)))
+
+    image = cover._fetch_logo_image(str(png_path))
+
+    assert image is not None
+    assert image.mode == "RGBA"
+    assert image.size == (500, 109)
+
+
+def test_fetch_logo_image_returns_none_for_missing_local_file():
+    assert cover._fetch_logo_image("/no/such/file.png") is None
+
+
 # --- render_cover (wrapper: fetch + compose + encode) ------------------------
 
 

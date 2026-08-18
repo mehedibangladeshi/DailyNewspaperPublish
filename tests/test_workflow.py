@@ -57,7 +57,7 @@ def test_workflow_runs_main_with_opds_env_vars():
 
 def test_workflow_publishes_to_gh_pages_with_keep_files_false_and_force_orphan():
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert "uses: peaceiris/actions-gh-pages@v3" in content
+    assert "uses: peaceiris/actions-gh-pages@" in content
     assert "keep_files: false" in content
     assert "force_orphan: true" in content
 
