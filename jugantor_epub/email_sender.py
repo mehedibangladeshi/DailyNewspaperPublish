@@ -80,3 +80,70 @@ def send_to_kindle(epub_entries, edition_date):
         raise NoEditionsSentError("No editions were sent: all entries were skipped or failed")
 
     return sent
+
+
+class KindleSender:
+    """Sends one Kindle email per source, reusing a single SMTP connection
+    across the whole run instead of reconnecting per source.
+
+    Connects lazily: no SMTP traffic happens until the first .send() call.
+    Later calls verify the connection is still alive via smtp.noop() and
+    transparently reconnect if it has gone stale, since a run's sources can
+    be minutes apart while each one scrapes and builds.
+    """
+
+    def __init__(self):
+        self._smtp = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if self._smtp is not None:
+            try:
+                self._smtp.quit()
+            except Exception:
+                pass
+            self._smtp = None
+        return False
+
+    def _ensure_connected(self):
+        if self._smtp is not None:
+            try:
+                status, _ = self._smtp.noop()
+                if status == 250:
+                    return
+            except Exception:
+                pass
+            self._smtp = None
+
+        smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        smtp.login(config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD)
+        self._smtp = smtp
+
+    def send(self, source_name, epub_path, edition_date):
+        """Send one source's epub as its own Kindle email.
+
+        Returns True if sent, False if skipped for being over Gmail's
+        attachment size limit. Raises on a real send failure so the caller
+        can count it as a failed source.
+        """
+        file_size = os.path.getsize(epub_path)
+        if file_size > GMAIL_MAX_ATTACHMENT_BYTES:
+            logger.warning(
+                "Skipping Kindle email for %s: %s is %d bytes, over Gmail's send limit",
+                source_name,
+                epub_path,
+                file_size,
+            )
+            return False
+
+        self._ensure_connected()
+        message = build_message(
+            [(source_name, epub_path)],
+            edition_date,
+            config.GMAIL_ADDRESS,
+            config.KINDLE_EMAIL,
+        )
+        self._smtp.send_message(message)
+        return True
