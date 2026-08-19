@@ -10,18 +10,18 @@ from jugantor_epub import epub_builder, images
 def _no_real_kindle_email(monkeypatch):
     """Guard against any test in this file accidentally dialing out to real
 
-    Gmail SMTP: default sending off and make an unstubbed send_to_kindle call
-    fail loudly instead of silently reaching smtplib. Tests that deliberately
-    exercise sending override these via monkeypatch later in their own body;
-    since they share this fixture's monkeypatch instance, their explicit
-    setattr calls run after these defaults and take precedence.
+    Gmail SMTP: default sending off and make an unstubbed KindleSender.send
+    call fail loudly instead of silently reaching smtplib. Tests that
+    deliberately exercise sending override this via monkeypatch later in
+    their own body; since they share this fixture's monkeypatch instance,
+    their explicit setattr calls run after this default and take precedence.
     """
     monkeypatch.setattr(main.config, "SEND_TO_KINDLE", False)
 
-    def _unexpected_send(*args, **kwargs):
+    def _unexpected_send(self, *args, **kwargs):
         raise AssertionError("unexpected send")
 
-    monkeypatch.setattr(main.email_sender, "send_to_kindle", _unexpected_send)
+    monkeypatch.setattr(main.email_sender.KindleSender, "send", _unexpected_send)
 
 
 @pytest.fixture(autouse=True)
@@ -247,7 +247,10 @@ def test_main_continues_to_next_source_after_one_fails(monkeypatch):
     exit_code = main.main()
 
     assert built_for == ["Fake Paper"]
-    assert exit_code == 0
+    # Per the plan's Global Constraints, a build failure now flips the exit
+    # code non-zero even though the run continues to the next source and
+    # the successful source still gets built.
+    assert exit_code == 1
 
 
 def test_main_returns_nonzero_when_all_sources_fail(monkeypatch):
@@ -262,25 +265,21 @@ def test_main_returns_nonzero_when_all_sources_fail(monkeypatch):
 
 
 def test_main_does_not_send_when_send_to_kindle_disabled(monkeypatch):
-    sent = []
-
     monkeypatch.setattr(main.config, "SOURCES", ["ok"])
     monkeypatch.setattr(main.config, "SEND_TO_KINDLE", False)
     monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
     monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
     monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
-    monkeypatch.setattr(
-        main.email_sender, "send_to_kindle", lambda *a, **k: sent.append(a)
-    )
 
     exit_code = main.main()
 
-    assert sent == []
     assert exit_code == 0
+    # the autouse fixture's KindleSender.send would raise AssertionError if called
 
 
-def test_main_sends_combined_email_with_every_built_source(monkeypatch):
+def test_main_sends_one_email_per_built_source_as_soon_as_it_builds(monkeypatch):
     sent = []
+    build_order = []
 
     monkeypatch.setattr(main.config, "SOURCES", ["ok1", "ok2"])
     monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
@@ -293,14 +292,18 @@ def test_main_sends_combined_email_with_every_built_source(monkeypatch):
         }[name],
     )
     monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
-    monkeypatch.setattr(
-        epub_builder,
-        "build_epub",
-        lambda source_name, *a, **k: f"/tmp/{source_name}.epub",
-    )
-    monkeypatch.setattr(
-        main.email_sender, "send_to_kindle", lambda *a, **k: sent.append(a)
-    )
+
+    def fake_build_epub(source_name, *a, **k):
+        build_order.append(source_name)
+        return f"/tmp/{source_name}.epub"
+
+    monkeypatch.setattr(epub_builder, "build_epub", fake_build_epub)
+
+    def fake_send(self, source_name, epub_path, edition_date):
+        sent.append((source_name, epub_path, edition_date))
+        return True
+
+    monkeypatch.setattr(main.email_sender.KindleSender, "send", fake_send)
 
     class _FixedDatetime(datetime):
         @classmethod
@@ -312,13 +315,11 @@ def test_main_sends_combined_email_with_every_built_source(monkeypatch):
     exit_code = main.main()
 
     assert exit_code == 0
-    assert len(sent) == 1
-    epub_entries, edition_date = sent[0]
-    assert epub_entries == [
-        ("Fake Paper", "/tmp/Fake Paper.epub"),
-        ("Fake Paper 2", "/tmp/Fake Paper 2.epub"),
+    assert build_order == ["Fake Paper", "Fake Paper 2"]
+    assert sent == [
+        ("Fake Paper", "/tmp/Fake Paper.epub", "2026-08-10"),
+        ("Fake Paper 2", "/tmp/Fake Paper 2.epub", "2026-08-10"),
     ]
-    assert edition_date == "2026-08-10"
 
 
 def test_main_returns_nonzero_when_send_to_kindle_fails(monkeypatch):
@@ -328,14 +329,29 @@ def test_main_returns_nonzero_when_send_to_kindle_fails(monkeypatch):
     monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
     monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
 
-    def _boom(*a, **k):
+    def _boom(self, *a, **k):
         raise RuntimeError("smtp exploded")
 
-    monkeypatch.setattr(main.email_sender, "send_to_kindle", _boom)
+    monkeypatch.setattr(main.email_sender.KindleSender, "send", _boom)
 
     exit_code = main.main()
 
     assert exit_code == 1
+
+
+def test_main_returns_zero_when_send_is_only_size_skipped(monkeypatch):
+    monkeypatch.setattr(main.config, "SOURCES", ["ok"])
+    monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
+    monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
+    monkeypatch.setattr(
+        main.email_sender.KindleSender, "send", lambda self, *a, **k: False
+    )
+
+    exit_code = main.main()
+
+    assert exit_code == 0
 
 
 def test_main_does_not_publish_opds_when_disabled(monkeypatch):
@@ -404,10 +420,10 @@ def test_main_still_publishes_opds_when_kindle_send_fails(monkeypatch):
     monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
     monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
 
-    def _boom(*a, **k):
+    def _boom(self, *a, **k):
         raise RuntimeError("smtp exploded")
 
-    monkeypatch.setattr(main.email_sender, "send_to_kindle", _boom)
+    monkeypatch.setattr(main.email_sender.KindleSender, "send", _boom)
     monkeypatch.setattr(
         main.opds_publish, "publish_catalog", lambda *a, **k: published.append(a)
     )

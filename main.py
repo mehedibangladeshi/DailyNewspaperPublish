@@ -1,6 +1,7 @@
 import importlib
 import logging
 import sys
+from contextlib import contextmanager
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -10,6 +11,11 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 DHAKA_TZ = ZoneInfo("Asia/Dhaka")
+
+
+@contextmanager
+def _null_context():
+    yield None
 
 
 def build_source_edition(source_module, edition_date, source_slug=None):
@@ -96,29 +102,52 @@ def build_source_edition(source_module, edition_date, source_slug=None):
 
 def main():
     edition_date = datetime.now(DHAKA_TZ).date().isoformat()
-    built = []
-    for source_slug in config.SOURCES:
-        source_module = importlib.import_module(f"jugantor_epub.sources.{source_slug}")
-        try:
-            output_path = build_source_edition(source_module, edition_date, source_slug)
-        except Exception as exc:
-            logger.error("Skipping source %s: %s", source_slug, exc)
-            continue
-        built.append((source_module.SOURCE_NAME, output_path))
 
-    if not built:
+    built_count = 0
+    sent_count = 0
+    size_skipped_count = 0
+    build_failures = 0
+    send_failures = 0
+
+    sender = email_sender.KindleSender() if config.SEND_TO_KINDLE else None
+
+    with sender if sender is not None else _null_context():
+        for source_slug in config.SOURCES:
+            source_module = importlib.import_module(f"jugantor_epub.sources.{source_slug}")
+            try:
+                output_path = build_source_edition(source_module, edition_date, source_slug)
+            except Exception as exc:
+                logger.error("Skipping source %s: %s", source_slug, exc)
+                build_failures += 1
+                continue
+            built_count += 1
+
+            if sender is not None:
+                try:
+                    sent = sender.send(source_module.SOURCE_NAME, output_path, edition_date)
+                except Exception as exc:
+                    logger.error("Failed to send Kindle email for %s: %s", source_module.SOURCE_NAME, exc)
+                    send_failures += 1
+                    continue
+                if sent:
+                    sent_count += 1
+                else:
+                    size_skipped_count += 1
+
+    if built_count == 0:
         logger.error("No source produced an edition; nothing to send.")
         return 1
 
-    exit_code = 0
-    if config.SEND_TO_KINDLE:
-        try:
-            sent_count = email_sender.send_to_kindle(built, edition_date)
-        except Exception as exc:
-            logger.error("Failed to send editions to Kindle: %s", exc)
-            exit_code = 1
-        else:
-            logger.info("Sent %d of %d edition(s) to Kindle.", sent_count, len(built))
+    logger.info(
+        "Run summary: %d built, %d sent, %d size-skipped, %d build failure(s), %d send failure(s)",
+        built_count,
+        sent_count,
+        size_skipped_count,
+        build_failures,
+        send_failures,
+    )
+
+    exit_code = 1 if (build_failures or send_failures) else 0
 
     if config.PUBLISH_OPDS:
         try:
