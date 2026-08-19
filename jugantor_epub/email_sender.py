@@ -145,5 +145,9 @@ class KindleSender:
             config.GMAIL_ADDRESS,
             config.KINDLE_EMAIL,
         )
-        self._smtp.send_message(message)
+        try:
+            self._smtp.send_message(message)
+        except Exception:
+            self._smtp = None
+            raise
         return True

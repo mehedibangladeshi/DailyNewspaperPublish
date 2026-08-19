@@ -273,3 +273,33 @@ def test_kindle_sender_closes_connection_on_exit(tmp_path):
 def test_kindle_sender_exit_does_not_raise_if_never_connected():
     with email_sender.KindleSender():
         pass  # no assertion needed - just must not raise
+
+
+def test_kindle_sender_reconnects_after_a_send_failure(tmp_path):
+    epub_a = tmp_path / "jugantor-2026-08-19.epub"
+    epub_a.write_bytes(b"paper A bytes")
+    epub_b = tmp_path / "prothomalo-2026-08-19.epub"
+    epub_b.write_bytes(b"paper B bytes")
+
+    first_conn = MagicMock()
+    first_conn.send_message.side_effect = _smtplib.SMTPException("boom")
+    second_conn = MagicMock()
+    second_conn.noop.return_value = (250, b"OK")
+
+    with patch(
+        "jugantor_epub.email_sender.smtplib.SMTP_SSL",
+        side_effect=[first_conn, second_conn],
+    ) as smtp_ssl_cls:
+        with email_sender.KindleSender() as sender:
+            try:
+                sender.send("যুগান্তর", str(epub_a), "2026-08-19")
+            except _smtplib.SMTPException:
+                pass
+            else:
+                raise AssertionError("expected SMTPException")
+
+            sent = sender.send("প্রথম আলো", str(epub_b), "2026-08-19")
+
+    assert sent is True
+    assert smtp_ssl_cls.call_count == 2
+    second_conn.send_message.assert_called_once()
