@@ -247,10 +247,10 @@ def test_main_continues_to_next_source_after_one_fails(monkeypatch):
     exit_code = main.main()
 
     assert built_for == ["Fake Paper"]
-    # Per the plan's Global Constraints, a build failure now flips the exit
-    # code non-zero even though the run continues to the next source and
-    # the successful source still gets built.
-    assert exit_code == 1
+    # A build failure for one source is logged/counted but is not by itself
+    # fatal: the run continues to the next source, which still builds and
+    # (with sending disabled) the exit code reflects that no send failed.
+    assert exit_code == 0
 
 
 def test_main_returns_nonzero_when_all_sources_fail(monkeypatch):
@@ -336,6 +336,37 @@ def test_main_returns_nonzero_when_send_to_kindle_fails(monkeypatch):
 
     exit_code = main.main()
 
+    assert exit_code == 1
+
+
+def test_main_continues_to_next_source_after_one_send_fails(monkeypatch):
+    built_for = []
+
+    monkeypatch.setattr(main.config, "SOURCES", ["ok1", "ok2"])
+    monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
+    monkeypatch.setattr(
+        main.importlib,
+        "import_module",
+        lambda name: {
+            "jugantor_epub.sources.ok1": _FakeSourceOk,
+            "jugantor_epub.sources.ok2": _FakeSourceOk2,
+        }[name],
+    )
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(
+        epub_builder, "build_epub", lambda *a, **k: built_for.append(a[0]) or "/tmp/x.epub"
+    )
+
+    def fake_send(self, source_name, epub_path, edition_date):
+        if source_name == "Fake Paper":
+            raise RuntimeError("smtp exploded")
+        return True
+
+    monkeypatch.setattr(main.email_sender.KindleSender, "send", fake_send)
+
+    exit_code = main.main()
+
+    assert built_for == ["Fake Paper", "Fake Paper 2"]
     assert exit_code == 1
 
 

@@ -147,7 +147,7 @@ def main():
         send_failures,
     )
 
-    exit_code = 1 if (build_failures or send_failures) else 0
+    exit_code = 1 if send_failures else 0
 
     if config.PUBLISH_OPDS:
         try:

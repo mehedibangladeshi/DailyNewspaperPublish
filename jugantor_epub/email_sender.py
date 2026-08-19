@@ -115,9 +115,13 @@ class KindleSender:
                     return
             except Exception:
                 pass
+            try:
+                self._smtp.close()
+            except Exception:
+                pass
             self._smtp = None
 
-        smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30)
         smtp.login(config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD)
         self._smtp = smtp
 
@@ -148,6 +152,10 @@ class KindleSender:
         try:
             self._smtp.send_message(message)
         except Exception:
+            try:
+                self._smtp.close()
+            except Exception:
+                pass
             self._smtp = None
             raise
         return True

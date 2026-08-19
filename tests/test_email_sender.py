@@ -178,7 +178,7 @@ def test_kindle_sender_connects_and_sends_on_first_send(tmp_path):
             sent = sender.send("যুগান্তর", str(epub_path), "2026-08-19")
 
     assert sent is True
-    smtp_ssl_cls.assert_called_once_with("smtp.gmail.com", 465)
+    smtp_ssl_cls.assert_called_once_with("smtp.gmail.com", 465, timeout=30)
     smtp_instance.login.assert_called_once()
     assert smtp_instance.send_message.call_count == 1
     message = smtp_instance.send_message.call_args.args[0]
