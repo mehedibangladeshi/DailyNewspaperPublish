@@ -6,8 +6,9 @@ article per page, with images and a properly embedded Bengali font (Noto
 Sans Bengali, SIL OFL) so Bengali text renders correctly on-device. Currently
 covers [Jugantor](https://www.jugantor.com/todays-paper),
 [Prothom Alo](https://www.prothomalo.com),
-[Dhaka Tribune](https://www.dhakatribune.com), and
-[The Daily Star](https://www.thedailystar.net/todays-news) (English); each is
+[Dhaka Tribune](https://www.dhakatribune.com),
+[The Daily Star](https://www.thedailystar.net/todays-news) (English), and
+[Ittefaq](https://www.ittefaq.com.bd); each is
 a separate epub built from its own source module.
 
 ## Setup
@@ -26,7 +27,7 @@ python3 -m venv .venv
 This scrapes today's edition of every source in `config.SOURCES` and writes one
 `output/{slug}-YYYY-MM-DD.epub` per source (e.g. `output/jugantor-YYYY-MM-DD.epub`,
 `output/prothomalo-YYYY-MM-DD.epub`, `output/dhakatribune-YYYY-MM-DD.epub`,
-`output/dailystar-YYYY-MM-DD.epub`).
+`output/dailystar-YYYY-MM-DD.epub`, `output/ittefaq-YYYY-MM-DD.epub`).
 Transfer those files to your Kindle (USB, or drag-and-drop into the
 Send-to-Kindle app / kindle.com library).
 
@@ -51,6 +52,10 @@ Send-to-Kindle app / kindle.com library).
   page once per section. Its masthead logo is also bundled locally
   (`jugantor_epub/assets/`) instead of fetched over the network, since the
   live site's only real logo asset is an SVG (`Pillow` can't decode it).
+- `jugantor_epub/sources/ittefaq.py` — scraping logic for ittefaq.com.bd.
+  DOM-card listings and a curated section allowlist, same shape as Dhaka
+  Tribune (its nav mixes real verticals with video/photo/jobs pages and a
+  `latest-news` aggregate that don't fit a text digest).
 - `jugantor_epub/sources/text_utils.py` — paper-agnostic NFC
   Unicode-normalization helpers, shared by every source module.
 - `jugantor_epub/sources/ld_json.py` — selects a `<script
