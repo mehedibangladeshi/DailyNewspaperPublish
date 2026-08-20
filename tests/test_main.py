@@ -123,6 +123,46 @@ class _FakeSourceAllFail:
         return "https://x/logo.png"
 
 
+def test_parse_args_defaults_to_no_source_filter():
+    args = main.parse_args([])
+
+    assert args.sources is None
+
+
+def test_parse_args_collects_repeated_source_flags():
+    args = main.parse_args(["--source", "ittefaq", "--source", "dhakatribune"])
+
+    assert args.sources == ["ittefaq", "dhakatribune"]
+
+
+def test_parse_args_rejects_unknown_source():
+    with pytest.raises(SystemExit):
+        main.parse_args(["--source", "not-a-real-source"])
+
+
+def test_main_builds_only_the_requested_source(monkeypatch):
+    built_for = []
+
+    monkeypatch.setattr(main.config, "SOURCES", ["ok1", "ok2"])
+    monkeypatch.setattr(
+        main.importlib,
+        "import_module",
+        lambda name: {
+            "jugantor_epub.sources.ok1": _FakeSourceOk,
+            "jugantor_epub.sources.ok2": _FakeSourceOk2,
+        }[name],
+    )
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(
+        epub_builder, "build_epub", lambda *a, **k: built_for.append(a[0]) or "/tmp/x.epub"
+    )
+
+    exit_code = main.main(sources=["ok2"])
+
+    assert exit_code == 0
+    assert built_for == ["Fake Paper 2"]
+
+
 def test_build_source_edition_skips_failed_article_and_caches_image_downloads(monkeypatch):
     download_calls = []
 

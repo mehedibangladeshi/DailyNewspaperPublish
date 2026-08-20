@@ -1,3 +1,4 @@
+import argparse
 import importlib
 import logging
 import sys
@@ -100,7 +101,21 @@ def build_source_edition(source_module, edition_date, source_slug=None):
     return output_path
 
 
-def main():
+def parse_args(argv):
+    parser = argparse.ArgumentParser(description="Build (and optionally send) newspaper editions.")
+    parser.add_argument(
+        "--source",
+        action="append",
+        choices=config.SOURCES,
+        dest="sources",
+        help="Build only this source; repeat to select several. Defaults to all of config.SOURCES.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(sources=None):
+    sources = sources or config.SOURCES
+
     edition_date = datetime.now(DHAKA_TZ).date().isoformat()
 
     built_count = 0
@@ -112,7 +127,7 @@ def main():
     sender = email_sender.KindleSender() if config.SEND_TO_KINDLE else None
 
     with sender if sender is not None else _null_context():
-        for source_slug in config.SOURCES:
+        for source_slug in sources:
             source_module = importlib.import_module(f"jugantor_epub.sources.{source_slug}")
             try:
                 output_path = build_source_edition(source_module, edition_date, source_slug)
@@ -162,4 +177,5 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    args = parse_args(sys.argv[1:])
+    sys.exit(main(args.sources))
