@@ -21,7 +21,11 @@ class _ArticleWebViewScreenState extends State<ArticleWebViewScreen> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onWebResourceError: (error) => setState(() => _hasError = true),
+          onWebResourceError: (error) {
+            if (error.isForMainFrame ?? true) {
+              setState(() => _hasError = true);
+            }
+          },
         ),
       )
       ..loadRequest(Uri.parse(widget.articleUrl));

@@ -37,8 +37,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: TabBar(
+        backgroundColor: Colors.black.withValues(alpha: 0.35),
+        elevation: 0,
+        bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
           tabs: kCategories.map((c) => Tab(text: c.label)).toList(),
