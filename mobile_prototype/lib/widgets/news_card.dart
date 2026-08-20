@@ -35,7 +35,7 @@ class NewsCard extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, Colors.black.withOpacity(0.85)],
+              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.85)],
               stops: const [0.5, 1.0],
             ),
           ),
@@ -51,7 +51,7 @@ class NewsCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
