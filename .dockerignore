@@ -1,0 +1,12 @@
+.venv
+venv
+__pycache__
+*.pyc
+.git
+.pytest_cache
+.coverage
+output
+gh-pages-checkout
+.worktrees
+mobile_prototype
+.claude

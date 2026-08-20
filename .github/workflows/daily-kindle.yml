@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   build-and-send:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 30
     permissions:
       contents: write
@@ -38,17 +38,23 @@ jobs:
         with:
           ref: gh-pages
           path: ${{ env.GH_PAGES_DIR }}
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.x'
-      - run: pip install -r requirements.txt
-      - run: python main.py
+      - run: docker build -t daily-newspaper .
+      - run: |
+          mkdir -p output "$GH_PAGES_DIR"
+          docker run --rm \
+            -e SEND_TO_KINDLE=true \
+            -e PUBLISH_OPDS=true \
+            -e GH_PAGES_DIR="$GH_PAGES_DIR" \
+            -e GMAIL_ADDRESS="$GMAIL_ADDRESS" \
+            -e GMAIL_APP_PASSWORD="$GMAIL_APP_PASSWORD" \
+            -e KINDLE_EMAIL="$KINDLE_EMAIL" \
+            -v "$PWD/output:/app/output" \
+            -v "$PWD/$GH_PAGES_DIR:/app/$GH_PAGES_DIR" \
+            daily-newspaper
         env:
-          SEND_TO_KINDLE: 'true'
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
-          PUBLISH_OPDS: 'true'
       - uses: actions/upload-artifact@v7
         if: always()
         with:
