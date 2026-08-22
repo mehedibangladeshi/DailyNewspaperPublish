@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><id>urn:daily-newspaper-opds:source:dhakatribune</id><title>Dhaka Tribune</title><updated>2026-08-22T00:00:00Z</updated><author><name>Dhaka Tribune</name></author><link rel="self" href="feed.xml" type="application/atom+xml;profile=opds-catalog;kind=acquisition" /><link rel="up" href="../catalog.xml" type="application/atom+xml;profile=opds-catalog;kind=navigation" /></feed>
