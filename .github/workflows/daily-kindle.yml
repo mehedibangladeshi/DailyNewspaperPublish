@@ -49,7 +49,7 @@ jobs:
             -e GMAIL_ADDRESS="$GMAIL_ADDRESS" \
             -e GMAIL_APP_PASSWORD="$GMAIL_APP_PASSWORD" \
             -e KINDLE_EMAIL="$KINDLE_EMAIL" \
-            -v "$HOME/actions-runner/_work/_temp/prebuilt-output:/app/output" \
+            -v "/home/mehedi/actions-runner/_work/_temp/prebuilt-output:/app/output" \
             -v "$PWD/$GH_PAGES_DIR:/app/$GH_PAGES_DIR" \
             daily-newspaper python tmp_send_existing_test.py
         env:
