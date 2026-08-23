@@ -28,6 +28,30 @@ Log out and back in for the group change to take effect.
 
 Verify with `docker run hello-world`.
 
+**Check the real path MTU before registering the runner.** Docker's default
+bridge network MTU is 1500, but many residential/PPPoE connections have a
+lower real path MTU. If Docker's MTU is set too high, small requests (page
+scraping, SMTP login) work fine, but sustained large transfers **from inside
+a container** (e.g. emailing a multi-MB epub attachment) can silently stall
+or drop mid-transfer — this bit us on 2026-08-23: Kindle sends kept failing
+with smtplib's "Server not connected" / "read operation timed out" only
+during the actual DATA transfer, never during login, and only when run
+through Docker (a bare host script sending the same size never reproduced
+it). Diagnosed with:
+```
+ping -M do -s 1472 -c 3 smtp.gmail.com
+```
+If that reports `Frag needed and DF set (mtu = N)`, the real path MTU is
+`N`. Set Docker's bridge MTU comfortably below that (we used `N - 80`, i.e.
+1400 for a reported 1480, since email_sender.py's own retry logic already
+tolerates the rare transient failure - the margin doesn't need to be exact):
+```
+sudo mkdir -p /etc/docker
+echo '{"mtu": 1400}' | sudo tee /etc/docker/daemon.json
+sudo systemctl restart docker
+```
+Verify a fresh container picks it up: `docker run --rm alpine sh -c "cat /sys/class/net/eth0/mtu"`.
+
 ## 2. Register the GitHub Actions runner
 
 1. On GitHub: open this repo → **Settings → Actions → Runners → New self-hosted runner**.

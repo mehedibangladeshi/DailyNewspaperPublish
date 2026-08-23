@@ -44,14 +44,13 @@ jobs:
           docker run --rm \
             -e SEND_TO_KINDLE=true \
             -e PUBLISH_OPDS=true \
-            -e SMTP_DEBUG=true \
             -e GH_PAGES_DIR="$GH_PAGES_DIR" \
             -e GMAIL_ADDRESS="$GMAIL_ADDRESS" \
             -e GMAIL_APP_PASSWORD="$GMAIL_APP_PASSWORD" \
             -e KINDLE_EMAIL="$KINDLE_EMAIL" \
-            -v "/home/mehedi/prebuilt-output-diag:/app/output" \
+            -v "$PWD/output:/app/output" \
             -v "$PWD/$GH_PAGES_DIR:/app/$GH_PAGES_DIR" \
-            daily-newspaper python tmp_send_existing_test.py
+            daily-newspaper
         env:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
