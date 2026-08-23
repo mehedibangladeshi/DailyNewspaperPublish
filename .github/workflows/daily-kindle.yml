@@ -48,6 +48,8 @@ jobs:
             -e GMAIL_ADDRESS="$GMAIL_ADDRESS" \
             -e GMAIL_APP_PASSWORD="$GMAIL_APP_PASSWORD" \
             -e KINDLE_EMAIL="$KINDLE_EMAIL" \
+            -e GITHUB_TOKEN="$GITHUB_TOKEN" \
+            -e GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
             -v "$PWD/output:/app/output" \
             -v "$PWD/$GH_PAGES_DIR:/app/$GH_PAGES_DIR" \
             daily-newspaper
@@ -55,6 +57,7 @@ jobs:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:

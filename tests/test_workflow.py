@@ -72,3 +72,10 @@ def test_workflow_publishes_to_gh_pages_with_keep_files_false_and_force_orphan()
 def test_workflow_publish_step_gated_on_checkout_outcome():
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "steps.gh_pages_exists.outputs.exists == 'false' || steps.gh_pages_checkout.outcome == 'success'" in content
+
+
+def test_workflow_forwards_github_token_and_repository_for_send_tracking():
+    content = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert 'GITHUB_TOKEN="$GITHUB_TOKEN"' in content
+    assert 'GITHUB_REPOSITORY="$GITHUB_REPOSITORY"' in content
+    assert "GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}" in content
