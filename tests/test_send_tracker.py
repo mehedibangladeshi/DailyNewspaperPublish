@@ -150,6 +150,31 @@ def test_write_remote_swallows_get_failure(tmp_path, monkeypatch):
     send_tracker.mark_sent(str(tmp_path), "jugantor", "2026-08-23")  # must not raise
 
 
+def test_missing_source_args_returns_all_sources_for_empty_mapping():
+    result = send_tracker.missing_source_args({}, sources=["jugantor", "prothomalo"])
+    assert result == "--source jugantor --source prothomalo"
+
+
+def test_missing_source_args_returns_only_missing_sources():
+    result = send_tracker.missing_source_args(
+        {"jugantor": True}, sources=["jugantor", "prothomalo", "dhakatribune"]
+    )
+    assert result == "--source prothomalo --source dhakatribune"
+
+
+def test_missing_source_args_returns_empty_string_when_all_sent():
+    result = send_tracker.missing_source_args(
+        {"jugantor": True, "prothomalo": True}, sources=["jugantor", "prothomalo"]
+    )
+    assert result == ""
+
+
+def test_missing_source_args_defaults_to_config_sources(monkeypatch):
+    monkeypatch.setattr(config, "SOURCES", ["jugantor", "prothomalo"])
+    result = send_tracker.missing_source_args({"jugantor": True})
+    assert result == "--source prothomalo"
+
+
 def test_write_remote_swallows_put_failure(tmp_path, monkeypatch):
     monkeypatch.setenv("GITHUB_TOKEN", "tok123")
     monkeypatch.setenv("GITHUB_REPOSITORY", "someuser/somerepo")

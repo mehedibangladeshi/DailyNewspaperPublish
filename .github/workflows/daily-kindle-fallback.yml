@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: daily-kindle
+  group: daily-kindle-fallback
   cancel-in-progress: false
 
 jobs:
@@ -14,12 +14,14 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      actions: read
     env:
       GH_PAGES_DIR: gh-pages-checkout
     steps:
       - id: guard
         run: |
-          TODAY_UTC=$(date -u +%Y-%m-%dT00:00:00Z)
+          TODAY_DHAKA=$(TZ='Asia/Dhaka' date +%Y-%m-%d)
+          TODAY_UTC=$(date -u -d "${TODAY_DHAKA} 00:00:00 +0600" +%Y-%m-%dT%H:%M:%SZ)
           COUNT=$(gh run list --repo "$REPO" --workflow daily-kindle.yml --json conclusion,createdAt --limit 20 \
             --jq "[.[] | select(.createdAt >= \"$TODAY_UTC\") | select(.conclusion == \"success\")] | length")
           if [ "$COUNT" -gt 0 ]; then
@@ -62,7 +64,7 @@ jobs:
       - id: dedup
         if: steps.guard.outputs.already_succeeded == 'false'
         run: |
-          TODAY=$(date -u +%Y-%m-%d)
+          TODAY=$(TZ='Asia/Dhaka' date +%Y-%m-%d)
           set +e
           RAW=$(gh api "repos/$REPO/contents/send-status/$TODAY.json?ref=gh-pages" --jq '.content' 2>/dev/null | tr -d '\n' | base64 -d 2>/dev/null)
           set -e
@@ -72,11 +74,10 @@ jobs:
           echo "$RAW" > /tmp/send-status.json
           MISSING=$(python3 -c "
           import json
-          from jugantor_epub import config
+          from jugantor_epub import config, send_tracker
           with open('/tmp/send-status.json') as f:
               sent = json.load(f)
-          missing = [s for s in config.SOURCES if not sent.get(s)]
-          print(' '.join(f'--source {s}' for s in missing))
+          print(send_tracker.missing_source_args(sent))
           ")
           echo "missing_sources=$MISSING" >> "$GITHUB_OUTPUT"
         env:
@@ -105,3 +106,7 @@ jobs:
           publish_dir: ${{ env.GH_PAGES_DIR }}
           keep_files: false
           force_orphan: true
+      - if: always() && steps.guard.outputs.already_succeeded == 'false' && steps.gh_pages_exists.outputs.exists == 'true' && steps.gh_pages_checkout.outcome == 'failure'
+        run: |
+          echo "::error::gh-pages checkout failed for a reason other than a missing branch; OPDS catalog was NOT republished this run (still serving the previous version)."
+          exit 1

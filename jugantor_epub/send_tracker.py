@@ -29,6 +29,16 @@ def _status_filename(edition_date):
     return f"{edition_date}.json"
 
 
+def missing_source_args(sent_mapping, sources=None):
+    """Returns a '--source X --source Y ...' string for sources in `sources`
+    (defaults to config.SOURCES) that aren't marked True in sent_mapping.
+    Used by the hosted-runner fallback workflow to rebuild only what the
+    primary run didn't already send.
+    """
+    sources = sources if sources is not None else config.SOURCES
+    return " ".join(f"--source {s}" for s in sources if not sent_mapping.get(s))
+
+
 def mark_sent(gh_pages_dir, source_slug, edition_date):
     _write_local(gh_pages_dir, source_slug, edition_date)
     _write_remote(source_slug, edition_date)

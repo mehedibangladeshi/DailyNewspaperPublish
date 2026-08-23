@@ -14,9 +14,9 @@ def test_fallback_workflow_runs_on_hosted_runner_with_buffer_schedule():
     assert "workflow_dispatch:" in content
 
 
-def test_fallback_workflow_shares_concurrency_group_with_primary():
+def test_fallback_workflow_has_its_own_concurrency_group():
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert "group: daily-kindle" in content
+    assert "group: daily-kindle-fallback" in content
 
 
 def test_fallback_workflow_guard_checks_todays_primary_run_success():
@@ -33,7 +33,8 @@ def test_fallback_workflow_guard_checks_todays_primary_run_success():
 def test_fallback_workflow_dedups_via_send_status_and_source_flag():
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "send-status/$TODAY.json?ref=gh-pages" in content
-    assert "from jugantor_epub import config" in content
+    assert "from jugantor_epub import config, send_tracker" in content
+    assert "send_tracker.missing_source_args(sent)" in content
     assert "missing_sources" in content
     assert "python main.py ${{ steps.dedup.outputs.missing_sources }}" in content
 
@@ -57,4 +58,4 @@ def test_fallback_workflow_publishes_gh_pages_same_as_primary():
 
 def test_fallback_workflow_gates_build_steps_on_the_guard():
     content = WORKFLOW_PATH.read_text(encoding="utf-8")
-    assert content.count("steps.guard.outputs.already_succeeded == 'false'") >= 5
+    assert content.count("steps.guard.outputs.already_succeeded == 'false'") == 10
