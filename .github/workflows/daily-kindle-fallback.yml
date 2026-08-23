@@ -1,0 +1,107 @@
+name: Daily Kindle edition (hosted-runner fallback)
+on:
+  schedule:
+    - cron: '0 4 * * *'   # 04:00 UTC = 10:00 BD time (UTC+6, no DST) - 2h after the primary self-hosted schedule
+  workflow_dispatch:
+
+concurrency:
+  group: daily-kindle
+  cancel-in-progress: false
+
+jobs:
+  fallback-build-and-send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_PAGES_DIR: gh-pages-checkout
+    steps:
+      - id: guard
+        run: |
+          TODAY_UTC=$(date -u +%Y-%m-%dT00:00:00Z)
+          COUNT=$(gh run list --repo "$REPO" --workflow daily-kindle.yml --json conclusion,createdAt --limit 20 \
+            --jq "[.[] | select(.createdAt >= \"$TODAY_UTC\") | select(.conclusion == \"success\")] | length")
+          if [ "$COUNT" -gt 0 ]; then
+            echo "already_succeeded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_succeeded=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+      - uses: actions/checkout@v7
+        if: steps.guard.outputs.already_succeeded == 'false'
+      - id: gh_pages_exists
+        if: steps.guard.outputs.already_succeeded == 'false'
+        run: |
+          set +e
+          git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif [ "$code" -eq 2 ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=unknown" >> "$GITHUB_OUTPUT"
+          fi
+      - id: gh_pages_checkout
+        if: steps.guard.outputs.already_succeeded == 'false' && steps.gh_pages_exists.outputs.exists == 'true'
+        continue-on-error: true
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+          path: ${{ env.GH_PAGES_DIR }}
+      - uses: actions/setup-python@v7
+        if: steps.guard.outputs.already_succeeded == 'false'
+        with:
+          python-version: '3.x'
+      - if: steps.guard.outputs.already_succeeded == 'false'
+        run: pip install -r requirements.txt
+      - id: dedup
+        if: steps.guard.outputs.already_succeeded == 'false'
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          set +e
+          RAW=$(gh api "repos/$REPO/contents/send-status/$TODAY.json?ref=gh-pages" --jq '.content' 2>/dev/null | tr -d '\n' | base64 -d 2>/dev/null)
+          set -e
+          if [ -z "$RAW" ]; then
+            RAW='{}'
+          fi
+          echo "$RAW" > /tmp/send-status.json
+          MISSING=$(python3 -c "
+          import json
+          from jugantor_epub import config
+          with open('/tmp/send-status.json') as f:
+              sent = json.load(f)
+          missing = [s for s in config.SOURCES if not sent.get(s)]
+          print(' '.join(f'--source {s}' for s in missing))
+          ")
+          echo "missing_sources=$MISSING" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+      - if: steps.guard.outputs.already_succeeded == 'false' && steps.dedup.outputs.missing_sources != ''
+        run: python main.py ${{ steps.dedup.outputs.missing_sources }}
+        env:
+          SEND_TO_KINDLE: 'true'
+          PUBLISH_OPDS: 'true'
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          KINDLE_EMAIL: ${{ secrets.KINDLE_EMAIL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v7
+        if: always() && steps.guard.outputs.already_succeeded == 'false'
+        with:
+          name: jugantor-epub-fallback-${{ github.run_id }}
+          path: output/*.epub
+          retention-days: 7
+          if-no-files-found: ignore
+      - uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        if: always() && steps.guard.outputs.already_succeeded == 'false' && (steps.gh_pages_exists.outputs.exists == 'false' || steps.gh_pages_checkout.outcome == 'success')
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${{ env.GH_PAGES_DIR }}
+          keep_files: false
+          force_orphan: true
