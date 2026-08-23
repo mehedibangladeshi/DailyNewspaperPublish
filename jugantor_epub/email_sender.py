@@ -128,7 +128,7 @@ class KindleSender:
         attempts = 3
         for attempt in range(attempts):
             try:
-                smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30)
+                smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=120)
                 if os.environ.get("SMTP_DEBUG"):
                     smtp.set_debuglevel(1)
                 smtp.login(config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD)
