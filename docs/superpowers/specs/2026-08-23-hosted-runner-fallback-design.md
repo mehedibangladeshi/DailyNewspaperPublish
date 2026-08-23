@@ -1,0 +1,53 @@
+# Hosted-Runner Fallback for the Self-Hosted Daily Workflow — Design
+
+## Context
+
+`.github/workflows/daily-kindle.yml` now runs the whole daily pipeline on a self-hosted runner (`thespace`, see `docs/superpowers/specs/2026-08-20-self-hosted-docker-runner-design.md`), which fixed Dhaka Tribune/Ittefaq's Cloudflare 403s by scraping from a real residential IP. The accepted trade-off at the time was that this machine's uptime/network becomes a single point of failure for *all five* sources, with no automated fallback beyond a manual `workflow_dispatch`. The user is now asking for that fallback: if `thespace` is unreachable (or the run otherwise fails) and no successful edition has gone out by 10:00 BD time, GitHub's own hosted infrastructure should pick up the slack automatically.
+
+## Decision: two separate workflow files, not one conditional one
+
+GitHub Actions doesn't cleanly support a runtime-conditional `runs-on` (it can't depend on a prior step's output), so the fallback lives in a **new file**, `daily-kindle-fallback.yml`, rather than adding branching logic to the existing `daily-kindle.yml`:
+
+- **`daily-kindle.yml`** (unchanged) — `runs-on: [self-hosted, Linux]`, scheduled `cron: '0 2 * * *'` (02:00 UTC / 08:00 BD).
+- **`daily-kindle-fallback.yml`** (new) — `runs-on: ubuntu-latest`, scheduled `cron: '0 4 * * *'` (04:00 UTC / 10:00 BD) — a 2-hour buffer after the primary run's start, giving `thespace` room for its normal run time (observed anywhere from ~5 to ~25+ minutes depending on network conditions) plus its own transient-failure retries before being treated as down. Also has `workflow_dispatch` for manual testing/triggering.
+
+## Decision: detect "should I run?" via the GitHub Actions API, not a signal from `thespace`
+
+If `thespace` is powered off or unreachable, a self-hosted-runner job simply sits **queued forever** — it does not fail, so checking `conclusion == 'failure'` alone is not sufficient. The fallback's first step queries the Actions API for today's runs of `daily-kindle.yml` (`created:>=<today 00:00 UTC>`) and proceeds only if **none** of them has `conclusion == 'success'`. This one condition naturally covers all three failure shapes: never picked up (stuck `queued`), picked up but hung (`in_progress` past the buffer), and picked up but failed (`conclusion == 'failure'`).
+
+A `success` conclusion here means `main.py` didn't exit non-zero — i.e. at least one source built **and no source's Kindle send hard-failed** (per `main.py`'s existing exit-code rules in `CLAUDE.md`'s daily-automation section). A run where every source failed to build, or that never completed at all, does not count as success, so the fallback (with its own dedup, below) is what fills in.
+
+## Decision: live per-source send tracking, not end-of-run publishing
+
+The scenario this fallback exists for — `thespace` going unreachable mid-run — is exactly the scenario where the workflow's normal end-of-job steps (the OPDS `gh-pages` publish) **never execute**, because there's no runner left alive to run them. Any tracking that only gets written "at the end" would be silently lost in precisely the case that matters most. So tracking is pushed live, over the network, from inside `main.py` itself, immediately after each successful send — independent of whether the job's later steps, or the machine, survive another second.
+
+- **New module `jugantor_epub/send_tracker.py`**, one function: `mark_sent(source_slug, edition_date)`, which does **two writes**, both required:
+  1. **Live remote write** via the GitHub REST Contents API against a fixed path on the `gh-pages` branch: `send-status/{edition_date}.json`, e.g. `{"jugantor": true, "prothomalo": true}`. `GET` the current file (if any) for its SHA and contents, merge in `{source_slug: true}`, `PUT` it back. A 404 on `GET` (no file yet today) is treated as an empty starting object, not an error. This is what survives the machine disappearing entirely before the job's later steps ever run.
+  2. **Local write** to the same relative path inside the job's own `$GH_PAGES_DIR` checkout (already mounted into the container, same directory `opds_publish.py` writes into). This is necessary because the primary workflow's existing OPDS publish step runs `peaceiris/actions-gh-pages` with `force_orphan: true` — it rebuilds `gh-pages` from scratch **from the local checkout**, discarding prior history. Without also writing locally, that publish step would silently erase the same day's remote write made moments earlier by write (1), the instant a run reaches that step successfully. Writing to both makes each one cover the other's gap: (1) survives a mid-run death that never reaches the publish step, (2) survives a completed run's own publish step not clobbering what (1) just wrote.
+  - Unlike per-source epub retention, `opds_publish.py`'s copy-forward logic only manages `{source}/*.epub`, `feed.xml`, and `catalog.xml` — it never looks at `send-status/`, so old dated status files would otherwise accumulate on `gh-pages` forever (harmless in size, but pointless clutter, since a status file is only ever useful on the day it's for). `mark_sent()`'s local write therefore also deletes any `send-status/*.json` file that isn't for today's `edition_date` before writing today's — a status file's whole lifetime is "today," so there is never a reason to keep more than one on disk at a time.
+  - Needs `GITHUB_TOKEN` and `GITHUB_REPOSITORY` (owner/repo) as env vars for write (1). Both are cheap to provide: `daily-kindle.yml`'s job already declares `permissions: contents: write` and has `secrets.GITHUB_TOKEN` available — it just needs to also pass them into the `docker run -e` list (currently only `GMAIL_*`/`KINDLE_EMAIL`/`SEND_TO_KINDLE`/`PUBLISH_OPDS`/`GH_PAGES_DIR` are passed through). No new permission scope is introduced; `contents: write` already covers Contents-API writes to any branch including `gh-pages`.
+  - Each write is wrapped in its own `try/except`, logging a warning on failure and never raising — this is a nice-to-have for the fallback's dedup, not core functionality, so it must follow the same error-isolation principle as the rest of the codebase (`CLAUDE.md`) and never take down an otherwise-successful send. The two writes are independent of each other (one failing doesn't skip the other).
+  - The remote write (1) only fires when `config.SEND_TO_KINDLE` is true and the two env vars are present; a bare local run just does the local write (harmless no-op there too, since local runs have no `$GH_PAGES_DIR` checkout to write into — guarded the same way).
+- **`main.py`** calls `send_tracker.mark_sent(source_slug, edition_date)` immediately after a `sender.send()` call returns `True` (an actual send, not a size-skip) — right next to where `sent_count` is incremented.
+
+## Decision: fallback only rebuilds what's missing, via the existing `--source` flag
+
+Before building anything, the fallback's guard step also fetches `send-status/{today}.json` from `gh-pages` (a simple authenticated `GET`; a 404 means "nothing sent yet today," i.e. build everything). It computes `config.SOURCES` minus the sources already marked `true`, and:
+
+- If that leaves nothing, the fallback **skips the build entirely** (echoes a message and exits) — today is already fully covered.
+- Otherwise, it runs the same `docker build` + `docker run` as the primary workflow, but with `main.py --source X --source Y ...` for just the missing sources (the flag already exists — see `c6da154` in git history — so no `main.py` changes are needed here).
+
+This directly targets the partial-failure scenario: if `thespace` sent Jugantor and Prothom Alo successfully and then went dark, the fallback at 10:00 BD sees those two already marked sent and only rebuilds Dhaka Tribune, The Daily Star, and Ittefaq (the last of which is expected to still fail on a hosted runner — same accepted limitation as before this migration, isolated per-source as always).
+
+## What this explicitly does NOT do
+
+- **No age-based retention policy for `send-status/*.json`** — there's no need for one, since `mark_sent()`'s local write (see above) always deletes any non-today file before writing today's, keeping exactly one status file on disk/on `gh-pages` at a time. If a status file for a date isn't found on `gh-pages` at read time (including "yesterday's," which by design no longer exists once today's first send happens), it's treated as "nothing sent" for that date — always a safe, if occasionally redundant, default.
+- **No retry-the-retry loop** — if the fallback run *also* fails, no further escalation is built. GitHub's standard failed-workflow notification is the safety net here, same as the rest of this pipeline's error handling philosophy.
+- **No changes to OPDS catalog structure** — the fallback publishes to `gh-pages` exactly the same way the primary workflow does (same `peaceiris/actions-gh-pages` step, same catalog-by-source-not-by-date organization); it's just another producer of the same artifact.
+
+## Testing
+
+- `send_tracker.py`: unit tests mocking `requests`/HTTP calls — merge-with-existing-content behavior, 404-treated-as-empty behavior, and that a request failure is caught and logged rather than raised (following the existing `tests/test_email_sender.py` mocking style).
+- `main.py`: a test confirming `mark_sent` is called once per actual send (not per size-skip), matching the existing `sent_count`/`size_skipped_count` test coverage shape already in `tests/test_main.py`.
+- The two new/changed workflow YAML files get the same treatment as the existing `tests/test_workflow.py` (structural assertions on the parsed YAML — correct `runs-on`, schedule, env passthrough, guard-step presence — not a live Actions run, which isn't feasible to unit test).
+- End-to-end verification of the guard logic and dedup happens via a manual `workflow_dispatch` of `daily-kindle-fallback.yml` after implementation, the same way the self-hosted runner move itself was verified in this session.
