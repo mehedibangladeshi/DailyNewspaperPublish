@@ -1,6 +1,7 @@
 import logging
 import os
 import smtplib
+import time
 from email.message import EmailMessage
 
 from . import config
@@ -121,9 +122,20 @@ class KindleSender:
                 pass
             self._smtp = None
 
-        smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30)
-        smtp.login(config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD)
-        self._smtp = smtp
+        # A fresh handshake occasionally stalls transiently (e.g. Gmail or a
+        # residential connection dropping an EHLO reply) - retry a couple of
+        # times before giving up, rather than failing that source's send.
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30)
+                smtp.login(config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD)
+                self._smtp = smtp
+                return
+            except Exception:
+                if attempt == attempts - 1:
+                    raise
+                time.sleep(2**attempt)
 
     def send(self, source_name, epub_path, edition_date):
         """Send one source's epub as its own Kindle email.

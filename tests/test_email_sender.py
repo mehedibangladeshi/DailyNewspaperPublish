@@ -275,6 +275,44 @@ def test_kindle_sender_exit_does_not_raise_if_never_connected():
         pass  # no assertion needed - just must not raise
 
 
+def test_kindle_sender_retries_a_transient_connect_failure(tmp_path):
+    epub_path = tmp_path / "jugantor-2026-08-19.epub"
+    epub_path.write_bytes(b"fake epub bytes")
+
+    working_conn = MagicMock()
+    with patch(
+        "jugantor_epub.email_sender.smtplib.SMTP_SSL",
+        side_effect=[_smtplib.SMTPServerDisconnected("Server not connected"), working_conn],
+    ) as smtp_ssl_cls:
+        with patch("jugantor_epub.email_sender.time.sleep"):
+            with email_sender.KindleSender() as sender:
+                sent = sender.send("যুগান্তর", str(epub_path), "2026-08-19")
+
+    assert sent is True
+    assert smtp_ssl_cls.call_count == 2
+    working_conn.send_message.assert_called_once()
+
+
+def test_kindle_sender_raises_after_repeated_transient_connect_failures(tmp_path):
+    epub_path = tmp_path / "jugantor-2026-08-19.epub"
+    epub_path.write_bytes(b"fake epub bytes")
+
+    with patch(
+        "jugantor_epub.email_sender.smtplib.SMTP_SSL",
+        side_effect=_smtplib.SMTPServerDisconnected("Server not connected"),
+    ) as smtp_ssl_cls:
+        with patch("jugantor_epub.email_sender.time.sleep"):
+            with email_sender.KindleSender() as sender:
+                try:
+                    sender.send("যুগান্তর", str(epub_path), "2026-08-19")
+                except _smtplib.SMTPServerDisconnected:
+                    pass
+                else:
+                    raise AssertionError("expected SMTPServerDisconnected")
+
+    assert smtp_ssl_cls.call_count == 3
+
+
 def test_kindle_sender_reconnects_after_a_send_failure(tmp_path):
     epub_a = tmp_path / "jugantor-2026-08-19.epub"
     epub_a.write_bytes(b"paper A bytes")
