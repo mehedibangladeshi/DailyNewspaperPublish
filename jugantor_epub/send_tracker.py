@@ -10,13 +10,19 @@ docs/superpowers/specs/2026-08-23-hosted-runner-fallback-design.md for why
 neither one alone is sufficient.
 """
 
+import base64
 import json
 import logging
 import os
 
+from . import config
+
 logger = logging.getLogger(__name__)
 
 STATUS_DIR_NAME = "send-status"
+GITHUB_API_BASE = "https://api.github.com"
+
+_session = config.make_session()
 
 
 def _status_filename(edition_date):
@@ -25,6 +31,7 @@ def _status_filename(edition_date):
 
 def mark_sent(gh_pages_dir, source_slug, edition_date):
     _write_local(gh_pages_dir, source_slug, edition_date)
+    _write_remote(source_slug, edition_date)
 
 
 def _write_local(gh_pages_dir, source_slug, edition_date):
@@ -47,3 +54,45 @@ def _write_local(gh_pages_dir, source_slug, edition_date):
             json.dump(existing, fh, sort_keys=True)
     except Exception as exc:
         logger.warning("Failed to record local send-status for %s: %s", source_slug, exc)
+
+
+def _write_remote(source_slug, edition_date):
+    github_token = os.environ.get("GITHUB_TOKEN")
+    github_repository = os.environ.get("GITHUB_REPOSITORY")
+    if not github_token or not github_repository:
+        return
+
+    api_url = f"{GITHUB_API_BASE}/repos/{github_repository}/contents/{STATUS_DIR_NAME}/{_status_filename(edition_date)}"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json",
+    }
+
+    try:
+        existing = {}
+        sha = None
+        get_resp = _session.get(
+            api_url, headers=headers, params={"ref": "gh-pages"}, timeout=config.REQUEST_TIMEOUT
+        )
+        if get_resp.status_code == 200:
+            body = get_resp.json()
+            existing = json.loads(base64.b64decode(body["content"]))
+            sha = body["sha"]
+        elif get_resp.status_code != 404:
+            get_resp.raise_for_status()
+
+        existing[source_slug] = True
+        payload = {
+            "message": f"mark {source_slug} sent for {edition_date}",
+            "content": base64.b64encode(json.dumps(existing, sort_keys=True).encode("utf-8")).decode(
+                "ascii"
+            ),
+            "branch": "gh-pages",
+        }
+        if sha:
+            payload["sha"] = sha
+
+        put_resp = _session.put(api_url, headers=headers, json=payload, timeout=config.REQUEST_TIMEOUT)
+        put_resp.raise_for_status()
+    except Exception as exc:
+        logger.warning("Failed to record remote send-status for %s: %s", source_slug, exc)
