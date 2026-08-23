@@ -35,6 +35,14 @@ def _no_real_opds_publish(monkeypatch):
     monkeypatch.setattr(main.opds_publish, "publish_catalog", _unexpected_publish)
 
 
+@pytest.fixture(autouse=True)
+def _no_real_send_tracking(monkeypatch):
+    """Same guard pattern as the other two autouse fixtures above - default
+    to a no-op so tests that merely exercise sending don't need a real
+    gh-pages checkout or network access."""
+    monkeypatch.setattr(main.send_tracker, "mark_sent", lambda *a, **k: None)
+
+
 class _FakeSourceOk:
     SOURCE_NAME = "Fake Paper"
     COVER_ACCENT_COLOR = (10, 20, 30)
@@ -360,6 +368,71 @@ def test_main_sends_one_email_per_built_source_as_soon_as_it_builds(monkeypatch)
         ("Fake Paper", "/tmp/Fake Paper.epub", "2026-08-10"),
         ("Fake Paper 2", "/tmp/Fake Paper 2.epub", "2026-08-10"),
     ]
+
+
+def test_main_marks_sent_after_each_successful_send(monkeypatch, tmp_path):
+    marked = []
+
+    monkeypatch.setattr(main.config, "SOURCES", ["ok1", "ok2"])
+    monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
+    monkeypatch.setattr(main.config, "GH_PAGES_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        main.importlib,
+        "import_module",
+        lambda name: {
+            "jugantor_epub.sources.ok1": _FakeSourceOk,
+            "jugantor_epub.sources.ok2": _FakeSourceOk2,
+        }[name],
+    )
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(epub_builder, "build_epub", lambda source_name, *a, **k: f"/tmp/{source_name}.epub")
+    monkeypatch.setattr(main.email_sender.KindleSender, "send", lambda self, *a, **k: True)
+    monkeypatch.setattr(
+        main.send_tracker,
+        "mark_sent",
+        lambda gh_pages_dir, source_slug, edition_date: marked.append(
+            (gh_pages_dir, source_slug, edition_date)
+        ),
+    )
+
+    class _FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 8, 10, 12, 0, tzinfo=tz or timezone.utc)
+
+    monkeypatch.setattr(main, "datetime", _FixedDatetime)
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert marked == [
+        (str(tmp_path), "ok1", "2026-08-10"),
+        (str(tmp_path), "ok2", "2026-08-10"),
+    ]
+
+
+def test_main_does_not_mark_sent_for_a_size_skipped_send(monkeypatch, tmp_path):
+    marked = []
+
+    monkeypatch.setattr(main.config, "SOURCES", ["ok"])
+    monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
+    monkeypatch.setattr(main.config, "GH_PAGES_DIR", str(tmp_path))
+    monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
+    monkeypatch.setattr(images, "download_image", lambda *a, **k: ("x.jpg", b"bytes"))
+    monkeypatch.setattr(epub_builder, "build_epub", lambda *a, **k: "/tmp/x.epub")
+    monkeypatch.setattr(main.email_sender.KindleSender, "send", lambda self, *a, **k: False)
+    monkeypatch.setattr(
+        main.send_tracker,
+        "mark_sent",
+        lambda gh_pages_dir, source_slug, edition_date: marked.append(
+            (gh_pages_dir, source_slug, edition_date)
+        ),
+    )
+
+    exit_code = main.main()
+
+    assert exit_code == 0
+    assert marked == []
 
 
 def test_main_returns_nonzero_when_send_to_kindle_fails(monkeypatch):

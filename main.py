@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from jugantor_epub import config, cover, email_sender, epub_builder, images, opds_publish
+from jugantor_epub import config, cover, email_sender, epub_builder, images, opds_publish, send_tracker
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -146,6 +146,7 @@ def main(sources=None):
                     continue
                 if sent:
                     sent_count += 1
+                    send_tracker.mark_sent(config.GH_PAGES_DIR, source_slug, edition_date)
                 else:
                     size_skipped_count += 1
 
