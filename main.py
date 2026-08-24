@@ -1,6 +1,7 @@
 import argparse
 import importlib
 import logging
+import os
 import sys
 from contextlib import contextmanager
 from datetime import datetime
@@ -23,12 +24,12 @@ def build_source_edition(source_module, edition_date, source_slug=None):
     sections_with_articles = []
     total_articles = 0
     skipped = 0
-    image_cache = {}
+    raw_image_cache = {}
 
-    def cached_download_image(image_url):
-        if image_url not in image_cache:
-            image_cache[image_url] = images.download_image(image_url)
-        return image_cache[image_url]
+    def cached_fetch_raw_image(image_url):
+        if image_url not in raw_image_cache:
+            raw_image_cache[image_url] = images.fetch_raw_image(image_url)
+        return raw_image_cache[image_url]
 
     for slug, section_name in source_module.discover_sections():
         try:
@@ -47,7 +48,7 @@ def build_source_edition(source_module, edition_date, source_slug=None):
                 continue
 
             image_url = detail.get("image_url") or item.get("thumbnail")
-            image_result = cached_download_image(image_url) if image_url else None
+            raw_image = cached_fetch_raw_image(image_url) if image_url else None
 
             articles.append(
                 {
@@ -57,8 +58,8 @@ def build_source_edition(source_module, edition_date, source_slug=None):
                     "display_time": item.get("listing_time") or detail.get("date_published", ""),
                     "paragraphs": detail.get("paragraphs") or [],
                     "summary": item.get("summary", ""),
-                    "image_filename": image_result[0] if image_result else None,
-                    "image_bytes": image_result[1] if image_result else None,
+                    "image_url": image_url,
+                    "_raw_image": raw_image,
                 }
             )
 
@@ -69,6 +70,9 @@ def build_source_edition(source_module, edition_date, source_slug=None):
 
     if total_articles == 0:
         raise RuntimeError(f"No articles were scraped for source {source_module.SOURCE_NAME!r}")
+
+    all_articles = [article for _, articles in sections_with_articles for article in articles]
+    _encode_article_images(all_articles, config.IMAGE_MAX_WIDTH, config.IMAGE_JPEG_QUALITY)
 
     try:
         cover_image_bytes = cover.render_cover(
@@ -90,6 +94,16 @@ def build_source_edition(source_module, edition_date, source_slug=None):
         cover_image_bytes=cover_image_bytes,
     )
 
+    output_path = _rebuild_if_oversized(
+        source_module,
+        edition_date,
+        sections_with_articles,
+        all_articles,
+        source_slug,
+        cover_image_bytes,
+        output_path,
+    )
+
     logger.info(
         "Built %s: %d section(s), %d article(s), %d skipped -> %s",
         source_module.SOURCE_NAME,
@@ -98,6 +112,54 @@ def build_source_edition(source_module, edition_date, source_slug=None):
         skipped,
         output_path,
     )
+    return output_path
+
+
+def _encode_article_images(articles, max_width, quality):
+    for article in articles:
+        raw_image = article["_raw_image"]
+        if raw_image is not None:
+            filename, data = images.encode_image(raw_image, article["image_url"], max_width, quality)
+            article["image_filename"] = filename
+            article["image_bytes"] = data
+        else:
+            article["image_filename"] = None
+            article["image_bytes"] = None
+
+
+def _rebuild_if_oversized(
+    source_module, edition_date, sections_with_articles, all_articles, source_slug, cover_image_bytes, output_path
+):
+    try:
+        size = os.path.getsize(output_path)
+    except OSError:
+        return output_path
+
+    if size <= email_sender.GMAIL_MAX_ATTACHMENT_BYTES:
+        return output_path
+
+    logger.info(
+        "%s built oversized (%d bytes over %d); re-encoding images at fallback settings and rebuilding",
+        source_module.SOURCE_NAME,
+        size,
+        email_sender.GMAIL_MAX_ATTACHMENT_BYTES,
+    )
+    try:
+        _encode_article_images(all_articles, config.IMAGE_MAX_WIDTH_FALLBACK, config.IMAGE_JPEG_QUALITY_FALLBACK)
+        output_path = epub_builder.build_epub(
+            source_module.SOURCE_NAME,
+            edition_date,
+            sections_with_articles,
+            source_slug=source_slug,
+            cover_image_bytes=cover_image_bytes,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Could not rebuild %s with fallback image settings, keeping oversized build: %s",
+            source_module.SOURCE_NAME,
+            exc,
+        )
+
     return output_path
 
 
