@@ -54,6 +54,43 @@ def test_fetch_raw_image_returns_none_on_request_failure(monkeypatch):
     assert images.fetch_raw_image("https://example.com/unreachable.jpg") is None
 
 
+def test_fetch_image_bytes_returns_raw_bytes(monkeypatch):
+    raw = _png_bytes(300, 200)
+    monkeypatch.setattr(images._session, "get", lambda *a, **k: _FakeResponse(raw))
+
+    data = images.fetch_image_bytes("https://example.com/pic.png")
+
+    assert isinstance(data, bytes)
+    assert data == raw
+
+
+def test_fetch_image_bytes_returns_none_for_empty_url():
+    assert images.fetch_image_bytes("") is None
+    assert images.fetch_image_bytes(None) is None
+
+
+def test_fetch_image_bytes_returns_none_on_request_failure(monkeypatch):
+    import requests
+
+    def _raise(*a, **k):
+        raise requests.RequestException("boom")
+
+    monkeypatch.setattr(images._session, "get", _raise)
+
+    assert images.fetch_image_bytes("https://example.com/unreachable.jpg") is None
+
+
+def test_decode_image_returns_usable_image_for_valid_bytes():
+    image = images.decode_image(_png_bytes(300, 200))
+
+    assert image is not None
+    assert image.size == (300, 200)
+
+
+def test_decode_image_returns_none_for_undecodable_bytes():
+    assert images.decode_image(b"not an image") is None
+
+
 def test_encode_image_resizes_when_wider_than_max_width():
     image = Image.new("RGB", (1600, 800), color=(200, 50, 50))
 

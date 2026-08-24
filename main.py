@@ -24,12 +24,12 @@ def build_source_edition(source_module, edition_date, source_slug=None):
     sections_with_articles = []
     total_articles = 0
     skipped = 0
-    raw_image_cache = {}
+    raw_bytes_cache = {}
 
-    def cached_fetch_raw_image(image_url):
-        if image_url not in raw_image_cache:
-            raw_image_cache[image_url] = images.fetch_raw_image(image_url)
-        return raw_image_cache[image_url]
+    def cached_fetch_image_bytes(image_url):
+        if image_url not in raw_bytes_cache:
+            raw_bytes_cache[image_url] = images.fetch_image_bytes(image_url)
+        return raw_bytes_cache[image_url]
 
     for slug, section_name in source_module.discover_sections():
         try:
@@ -48,7 +48,7 @@ def build_source_edition(source_module, edition_date, source_slug=None):
                 continue
 
             image_url = detail.get("image_url") or item.get("thumbnail")
-            raw_image = cached_fetch_raw_image(image_url) if image_url else None
+            raw_bytes = cached_fetch_image_bytes(image_url) if image_url else None
 
             articles.append(
                 {
@@ -59,7 +59,7 @@ def build_source_edition(source_module, edition_date, source_slug=None):
                     "paragraphs": detail.get("paragraphs") or [],
                     "summary": item.get("summary", ""),
                     "image_url": image_url,
-                    "_raw_image": raw_image,
+                    "_raw_bytes": raw_bytes,
                 }
             )
 
@@ -98,7 +98,6 @@ def build_source_edition(source_module, edition_date, source_slug=None):
         source_module,
         edition_date,
         sections_with_articles,
-        all_articles,
         source_slug,
         cover_image_bytes,
         output_path,
@@ -117,9 +116,10 @@ def build_source_edition(source_module, edition_date, source_slug=None):
 
 def _encode_article_images(articles, max_width, quality):
     for article in articles:
-        raw_image = article["_raw_image"]
-        if raw_image is not None:
-            filename, data = images.encode_image(raw_image, article["image_url"], max_width, quality)
+        raw_bytes = article["_raw_bytes"]
+        image = images.decode_image(raw_bytes) if raw_bytes is not None else None
+        if image is not None:
+            filename, data = images.encode_image(image, article["image_url"], max_width, quality)
             article["image_filename"] = filename
             article["image_bytes"] = data
         else:
@@ -128,15 +128,18 @@ def _encode_article_images(articles, max_width, quality):
 
 
 def _rebuild_if_oversized(
-    source_module, edition_date, sections_with_articles, all_articles, source_slug, cover_image_bytes, output_path
+    source_module, edition_date, sections_with_articles, source_slug, cover_image_bytes, output_path
 ):
     try:
         size = os.path.getsize(output_path)
-    except OSError:
+    except OSError as exc:
+        logger.debug("Could not stat %s to check size: %s", output_path, exc)
         return output_path
 
     if size <= email_sender.GMAIL_MAX_ATTACHMENT_BYTES:
         return output_path
+
+    all_articles = [article for _, articles in sections_with_articles for article in articles]
 
     logger.info(
         "%s built oversized (%d bytes over %d); re-encoding images at fallback settings and rebuilding",

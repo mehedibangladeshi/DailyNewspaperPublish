@@ -12,11 +12,10 @@ logger = logging.getLogger(__name__)
 _session = config.make_session()
 
 
-def fetch_raw_image(url):
-    """Fetch and decode an image, without resizing or re-encoding it.
+def fetch_image_bytes(url):
+    """Fetch an image's raw compressed bytes over the network, without decoding.
 
-    Returns a PIL Image, or None if the URL is empty or the image
-    couldn't be fetched or decoded.
+    Returns bytes, or None if the URL is empty or the request failed.
     """
     if not url:
         return None
@@ -24,12 +23,37 @@ def fetch_raw_image(url):
     try:
         response = _session.get(url, timeout=config.REQUEST_TIMEOUT)
         response.raise_for_status()
-        image = Image.open(io.BytesIO(response.content))
-        image = image.convert("RGB")
-    except (requests.RequestException, OSError) as exc:
+    except requests.RequestException as exc:
         logger.warning("Skipping image %s: %s", url, exc)
         return None
 
+    return response.content
+
+
+def decode_image(data):
+    """Decode raw image bytes into a PIL Image.
+
+    Returns None if the bytes can't be decoded.
+    """
+    try:
+        image = Image.open(io.BytesIO(data))
+        return image.convert("RGB")
+    except OSError:
+        return None
+
+
+def fetch_raw_image(url):
+    """Fetch and decode an image, without resizing or re-encoding it.
+
+    Returns a PIL Image, or None if the URL is empty or the image
+    couldn't be fetched or decoded.
+    """
+    data = fetch_image_bytes(url)
+    if data is None:
+        return None
+    image = decode_image(data)
+    if image is None:
+        logger.warning("Skipping image %s: could not decode", url)
     return image
 
 

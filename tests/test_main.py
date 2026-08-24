@@ -160,7 +160,8 @@ def test_main_builds_only_the_requested_source(monkeypatch):
             "jugantor_epub.sources.ok2": _FakeSourceOk2,
         }[name],
     )
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -178,9 +179,12 @@ def test_build_source_edition_skips_failed_article_and_caches_image_downloads(mo
     fetch_calls = []
     encode_calls = []
 
-    def fake_fetch_raw_image(url):
+    def fake_fetch_image_bytes(url):
         fetch_calls.append(url)
-        return "raw-image"
+        return b"raw-bytes"
+
+    def fake_decode_image(data):
+        return "decoded-image"
 
     def fake_encode_image(image, url, max_width, quality):
         encode_calls.append((image, url, max_width, quality))
@@ -192,7 +196,8 @@ def test_build_source_edition_skips_failed_article_and_caches_image_downloads(mo
         captured["sections_with_articles"] = sections_with_articles
         return "/tmp/fake.epub"
 
-    monkeypatch.setattr(images, "fetch_raw_image", fake_fetch_raw_image)
+    monkeypatch.setattr(images, "fetch_image_bytes", fake_fetch_image_bytes)
+    monkeypatch.setattr(images, "decode_image", fake_decode_image)
     monkeypatch.setattr(images, "encode_image", fake_encode_image)
     monkeypatch.setattr(epub_builder, "build_epub", fake_build_epub)
 
@@ -221,7 +226,8 @@ def test_build_source_edition_passes_rendered_cover_to_build_epub(monkeypatch):
         captured["cover_image_bytes"] = kwargs.get("cover_image_bytes")
         return "/tmp/fake.epub"
 
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -250,7 +256,8 @@ def test_build_source_edition_forwards_a_sources_prepare_logo_image_when_defined
     class _FakeSourceWithLogoPrep(_FakeSourceOk):
         prepare_logo_image = staticmethod(fake_prepare_logo_image)
 
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -272,7 +279,8 @@ def test_build_source_edition_builds_without_cover_when_render_cover_fails(monke
     def _boom(*a, **k):
         raise RuntimeError("PIL exploded")
 
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -307,7 +315,8 @@ def test_main_continues_to_next_source_after_one_fails(monkeypatch):
             "jugantor_epub.sources.ok": _FakeSourceOk,
         }[name],
     )
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -339,7 +348,8 @@ def test_main_does_not_send_when_send_to_kindle_disabled(monkeypatch):
     monkeypatch.setattr(main.config, "SOURCES", ["ok"])
     monkeypatch.setattr(main.config, "SEND_TO_KINDLE", False)
     monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -365,7 +375,8 @@ def test_main_sends_one_email_per_built_source_as_soon_as_it_builds(monkeypatch)
             "jugantor_epub.sources.ok2": _FakeSourceOk2,
         }[name],
     )
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -413,7 +424,8 @@ def test_main_marks_sent_after_each_successful_send(monkeypatch, tmp_path):
             "jugantor_epub.sources.ok2": _FakeSourceOk2,
         }[name],
     )
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -450,7 +462,8 @@ def test_main_does_not_mark_sent_for_a_size_skipped_send(monkeypatch, tmp_path):
     monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
     monkeypatch.setattr(main.config, "GH_PAGES_DIR", str(tmp_path))
     monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -474,7 +487,8 @@ def test_main_returns_nonzero_when_send_to_kindle_fails(monkeypatch):
     monkeypatch.setattr(main.config, "SOURCES", ["ok"])
     monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
     monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -503,7 +517,8 @@ def test_main_continues_to_next_source_after_one_send_fails(monkeypatch):
             "jugantor_epub.sources.ok2": _FakeSourceOk2,
         }[name],
     )
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -528,7 +543,8 @@ def test_main_returns_zero_when_send_is_only_size_skipped(monkeypatch):
     monkeypatch.setattr(main.config, "SOURCES", ["ok"])
     monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
     monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -546,7 +562,8 @@ def test_main_does_not_publish_opds_when_disabled(monkeypatch):
     monkeypatch.setattr(main.config, "SOURCES", ["ok"])
     monkeypatch.setattr(main.config, "PUBLISH_OPDS", False)
     monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -565,7 +582,8 @@ def test_main_publishes_opds_catalog_when_enabled(monkeypatch):
     monkeypatch.setattr(main.config, "GH_PAGES_DIR", "/tmp/gh-pages")
     monkeypatch.setattr(main.config, "OUTPUT_DIR", "/tmp/output")
     monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -591,7 +609,8 @@ def test_main_returns_nonzero_when_opds_publish_fails(monkeypatch):
     monkeypatch.setattr(main.config, "SOURCES", ["ok"])
     monkeypatch.setattr(main.config, "PUBLISH_OPDS", True)
     monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -614,7 +633,8 @@ def test_main_still_publishes_opds_when_kindle_send_fails(monkeypatch):
     monkeypatch.setattr(main.config, "SEND_TO_KINDLE", True)
     monkeypatch.setattr(main.config, "PUBLISH_OPDS", True)
     monkeypatch.setattr(main.importlib, "import_module", lambda name: _FakeSourceOk)
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(
         images, "encode_image", lambda image, url, max_width, quality: ("x.jpg", b"bytes")
     )
@@ -646,14 +666,15 @@ def test_build_source_edition_rebuilds_with_fallback_settings_when_oversized(mon
         build_settings.append(sections_with_articles[0][1][0]["image_bytes"])
         return str(path)
 
-    def fake_fetch_raw_image(url):
+    def fake_fetch_image_bytes(url):
         fetch_calls.append(url)
-        return "raw-image"
+        return b"raw-image"
 
     def fake_encode_image(image, url, max_width, quality):
         return ("shared.jpg", f"{max_width}-{quality}".encode())
 
-    monkeypatch.setattr(images, "fetch_raw_image", fake_fetch_raw_image)
+    monkeypatch.setattr(images, "fetch_image_bytes", fake_fetch_image_bytes)
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(images, "encode_image", fake_encode_image)
     monkeypatch.setattr(epub_builder, "build_epub", fake_build_epub)
 
@@ -689,7 +710,8 @@ def test_build_source_edition_keeps_oversized_build_if_retry_rebuild_fails(monke
             raise RuntimeError("encode exploded")
         return ("shared.jpg", b"bytes")
 
-    monkeypatch.setattr(images, "fetch_raw_image", lambda url: "raw-image")
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw-image")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
     monkeypatch.setattr(images, "encode_image", _encode_image)
     monkeypatch.setattr(epub_builder, "build_epub", fake_build_epub)
 
@@ -697,3 +719,29 @@ def test_build_source_edition_keeps_oversized_build_if_retry_rebuild_fails(monke
 
     assert output_path == str(tmp_path / "fake.epub")
     assert build_calls["n"] == 1  # the retry's rebuild never happened - encode blew up first
+
+
+def test_build_source_edition_leaves_normal_sized_build_alone(monkeypatch, tmp_path):
+    build_calls = {"n": 0}
+    encode_widths = []
+
+    def fake_build_epub(source_name, edition_date, sections_with_articles, **kwargs):
+        build_calls["n"] += 1
+        path = tmp_path / "fake.epub"
+        path.write_bytes(b"x" * 10)  # tiny - well under the real Gmail threshold
+        return str(path)
+
+    def fake_encode_image(image, url, max_width, quality):
+        encode_widths.append(max_width)
+        return ("shared.jpg", b"bytes")
+
+    monkeypatch.setattr(images, "fetch_image_bytes", lambda url: b"raw")
+    monkeypatch.setattr(images, "decode_image", lambda data: "decoded")
+    monkeypatch.setattr(images, "encode_image", fake_encode_image)
+    monkeypatch.setattr(epub_builder, "build_epub", fake_build_epub)
+
+    output_path = main.build_source_edition(_FakeSourceOk, "2026-08-10")
+
+    assert output_path == str(tmp_path / "fake.epub")
+    assert build_calls["n"] == 1  # no retry rebuild triggered
+    assert encode_widths == [main.config.IMAGE_MAX_WIDTH, main.config.IMAGE_MAX_WIDTH]
