@@ -16,6 +16,12 @@ REQUEST_DELAY_SECONDS = 0.7
 IMAGE_MAX_WIDTH = 800
 IMAGE_JPEG_QUALITY = 75
 
+# Used only as a one-time fallback when a built epub comes in over Gmail's
+# attachment limit (see main.py's build_source_edition) - not the default
+# for every build.
+IMAGE_MAX_WIDTH_FALLBACK = 500
+IMAGE_JPEG_QUALITY_FALLBACK = 50
+
 # Each entry is a module under jugantor_epub/sources/ exposing:
 #   discover_sections() -> list[(slug, section_name)]
 #   list_articles(slug, edition_date) -> list[dict]
