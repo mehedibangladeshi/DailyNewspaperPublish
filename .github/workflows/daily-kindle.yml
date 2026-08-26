@@ -42,6 +42,7 @@ jobs:
       - run: |
           mkdir -p output "$GH_PAGES_DIR"
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -e SEND_TO_KINDLE=true \
             -e PUBLISH_OPDS=true \
             -e GH_PAGES_DIR="$GH_PAGES_DIR" \
