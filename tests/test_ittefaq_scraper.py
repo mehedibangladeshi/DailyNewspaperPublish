@@ -91,6 +91,47 @@ def test_discover_sections_returns_live_parsed_sections(monkeypatch, load_fixtur
     assert ("sports", "খেলা") in sections
 
 
+def test_discover_sections_moves_editorial_off_the_front(monkeypatch, load_fixture):
+    monkeypatch.setattr(ittefaq, "_get", lambda url: load_fixture("ittefaq_home.html"))
+
+    sections = ittefaq.discover_sections()
+
+    assert sections[0][0] != "editorial"
+    slugs = [slug for slug, _ in sections]
+    assert len(slugs) - slugs.index("editorial") - 1 == ittefaq.EDITORIAL_SECTIONS_AFTER
+
+
+def test_reorder_editorial_moves_it_to_fixed_offset_from_end():
+    sections = [("editorial", "সম্পাদকীয়"), ("a", "A"), ("b", "B"), ("c", "C")]
+
+    reordered = ittefaq._reorder_editorial(sections)
+
+    assert reordered == [("a", "A"), ("editorial", "সম্পাদকীয়"), ("b", "B"), ("c", "C")]
+
+
+def test_reorder_editorial_is_noop_when_editorial_absent():
+    sections = [("a", "A"), ("b", "B")]
+
+    assert ittefaq._reorder_editorial(sections) == sections
+
+
+def test_reorder_editorial_appends_at_end_when_too_few_sections_remain():
+    sections = [("editorial", "সম্পাদকীয়"), ("a", "A")]
+
+    reordered = ittefaq._reorder_editorial(sections)
+
+    assert reordered == [("a", "A"), ("editorial", "সম্পাদকীয়")]
+
+
+def test_reorder_editorial_preserves_relative_order_of_other_sections():
+    sections = [("editorial", "সম্পাদকীয়"), ("a", "A"), ("b", "B"), ("c", "C"), ("d", "D")]
+
+    reordered = ittefaq._reorder_editorial(sections)
+
+    slugs = [slug for slug, _ in reordered]
+    assert slugs == ["a", "b", "editorial", "c", "d"]
+
+
 def test_list_articles_fetches_then_parses(monkeypatch, load_fixture):
     seen_urls = []
 

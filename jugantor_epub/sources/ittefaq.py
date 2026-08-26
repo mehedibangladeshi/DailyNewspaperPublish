@@ -103,19 +103,44 @@ def parse_sections(html):
     return sections
 
 
+
+# Editorial is a reflective/opinion piece, not front-page news - the live
+# nav happens to list it early (right after the non-core links get filtered
+# out), which would otherwise make it the first section readers see. Move it
+# to sit with exactly this many sections after it, matching where the print
+# edition (and this module's own FALLBACK_SECTIONS) traditionally places it.
+EDITORIAL_SLUG = "editorial"
+EDITORIAL_SECTIONS_AFTER = 2
+
+
+def _reorder_editorial(sections):
+    """Move the editorial section so exactly EDITORIAL_SECTIONS_AFTER other
+    sections follow it, regardless of where it was discovered in nav order."""
+    editorial = next((s for s in sections if s[0] == EDITORIAL_SLUG), None)
+    if editorial is None:
+        return sections
+
+    rest = [s for s in sections if s[0] != EDITORIAL_SLUG]
+    if len(rest) < EDITORIAL_SECTIONS_AFTER:
+        position = len(rest)
+    else:
+        position = len(rest) - EDITORIAL_SECTIONS_AFTER
+    return rest[:position] + [editorial] + rest[position:]
+
+
 def discover_sections():
     try:
         html = _get(BASE_URL)
     except requests.RequestException:
         logger.warning("Could not reach %s, using fallback section list", BASE_URL)
-        return list(FALLBACK_SECTIONS)
+        return _reorder_editorial(list(FALLBACK_SECTIONS))
 
     sections = parse_sections(html)
     if not sections:
         logger.warning("No sections discovered on %s, using fallback list", BASE_URL)
-        return list(FALLBACK_SECTIONS)
+        return _reorder_editorial(list(FALLBACK_SECTIONS))
 
-    return sections
+    return _reorder_editorial(sections)
 
 
 def parse_articles(html):
